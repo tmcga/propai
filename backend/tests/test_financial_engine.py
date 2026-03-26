@@ -12,7 +12,6 @@ Tests cover:
 Run with: pytest tests/ -v --cov=engine
 """
 
-import math
 import pytest
 import sys
 import os
@@ -22,26 +21,19 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from engine.financial.metrics import (
     effective_gross_income,
-    net_operating_income,
     cap_rate,
     value_from_cap_rate,
     gross_rent_multiplier,
     annual_debt_service,
     loan_balance,
     debt_service_coverage_ratio,
-    before_tax_cash_flow,
     cash_on_cash_return,
-    operating_expense_ratio,
-    break_even_occupancy,
     net_sale_proceeds,
-    generate_warnings,
 )
 from engine.financial.dcf import (
     npv,
     irr,
     equity_multiple,
-    total_profit,
-    average_cash_on_cash,
     DCFEngine,
 )
 from engine.financial.models import (
@@ -60,6 +52,7 @@ from engine.financial.waterfall import WaterfallEngine
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def sample_multifamily_deal() -> DealInput:
@@ -115,6 +108,7 @@ def simple_cash_flows() -> list[float]:
 # Core Metrics Tests
 # ---------------------------------------------------------------------------
 
+
 class TestEffectiveGrossIncome:
     def test_basic_egi(self):
         """EGI = GSI × (1 - vacancy) × (1 - credit_loss) + other"""
@@ -167,7 +161,9 @@ class TestDebtService:
         rate = 0.0675
         amort = 30
 
-        ds, principal, interest = annual_debt_service(loan_amt, rate, amort, current_year=1)
+        ds, principal, interest = annual_debt_service(
+            loan_amt, rate, amort, current_year=1
+        )
 
         # Verify: annual DS should be reasonable (~$260k range for these params)
         assert 200_000 < ds < 350_000
@@ -258,6 +254,7 @@ class TestNetSaleProceeds:
 # DCF Engine Tests
 # ---------------------------------------------------------------------------
 
+
 class TestNPV:
     def test_zero_rate_npv(self):
         """At 0% discount rate, NPV = sum of all cash flows."""
@@ -347,6 +344,7 @@ class TestDCFEngine:
 # Pro Forma Generator Tests
 # ---------------------------------------------------------------------------
 
+
 class TestProFormaEngine:
     def test_pro_forma_length(self, sample_multifamily_deal):
         """Pro forma should have exactly hold_period_years rows."""
@@ -371,7 +369,9 @@ class TestProFormaEngine:
             prev = result.pro_forma[i - 1].gross_scheduled_income
             curr = result.pro_forma[i].gross_scheduled_income
             expected = prev * (1 + rate)
-            assert abs(curr - expected) < 1.0, f"Rent not growing correctly in year {i + 1}"
+            assert abs(curr - expected) < 1.0, (
+                f"Rent not growing correctly in year {i + 1}"
+            )
 
     def test_going_in_cap_rate(self, sample_multifamily_deal):
         """Going-in cap rate should be in a reasonable range."""
@@ -423,14 +423,14 @@ class TestProFormaEngine:
             units=20,
             closing_costs=0.01,
             loan=LoanInput(
-                ltv=0.85,          # High LTV
+                ltv=0.85,  # High LTV
                 interest_rate=0.07,
                 amortization_years=30,
                 origination_fee=0.01,
             ),
             operations=OperatingAssumptions(
                 gross_scheduled_income=400_000,
-                vacancy_rate=0.02,     # Very aggressive vacancy
+                vacancy_rate=0.02,  # Very aggressive vacancy
                 credit_loss_rate=0.00,
                 other_income=0,
                 property_taxes=50_000,
@@ -452,12 +452,15 @@ class TestProFormaEngine:
         )
         engine = ProFormaEngine(aggressive_deal)
         result = engine.underwrite(include_sensitivity=False)
-        assert len(result.warnings) > 0, "Should have generated warnings for aggressive assumptions"
+        assert len(result.warnings) > 0, (
+            "Should have generated warnings for aggressive assumptions"
+        )
 
 
 # ---------------------------------------------------------------------------
 # Waterfall Tests
 # ---------------------------------------------------------------------------
+
 
 class TestWaterfallEngine:
     @pytest.fixture
@@ -481,7 +484,14 @@ class TestWaterfallEngine:
             cash_flows=cash_flows,
         )
         result = engine.compute()
-        assert abs(result.lp_total_distributions + result.gp_total_distributions - total_positive) < 1.0
+        assert (
+            abs(
+                result.lp_total_distributions
+                + result.gp_total_distributions
+                - total_positive
+            )
+            < 1.0
+        )
 
     def test_lp_gets_more_than_gp_in_normal_deal(self, equity_structure):
         """LP should receive majority of distributions (90% co-invest)."""
@@ -520,6 +530,7 @@ class TestWaterfallEngine:
 # ---------------------------------------------------------------------------
 # Edge Cases
 # ---------------------------------------------------------------------------
+
 
 class TestEdgeCases:
     def test_unleveraged_deal(self):
@@ -571,7 +582,12 @@ class TestEdgeCases:
             asset_class=AssetClass.SFR,
             purchase_price=300_000,
             closing_costs=0.01,
-            loan=LoanInput(ltv=0.70, interest_rate=0.08, amortization_years=30, origination_fee=0.01),
+            loan=LoanInput(
+                ltv=0.70,
+                interest_rate=0.08,
+                amortization_years=30,
+                origination_fee=0.01,
+            ),
             operations=OperatingAssumptions(
                 gross_scheduled_income=24_000,
                 vacancy_rate=0.05,
@@ -587,7 +603,12 @@ class TestEdgeCases:
                 rent_growth_rate=0.03,
                 expense_growth_rate=0.02,
             ),
-            exit=ExitAssumptions(hold_period_years=1, exit_cap_rate=0.06, selling_costs_pct=0.06, discount_rate=0.10),
+            exit=ExitAssumptions(
+                hold_period_years=1,
+                exit_cap_rate=0.06,
+                selling_costs_pct=0.06,
+                discount_rate=0.10,
+            ),
         )
         engine = ProFormaEngine(deal)
         result = engine.underwrite(include_sensitivity=False)

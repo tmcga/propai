@@ -14,12 +14,11 @@ from __future__ import annotations
 import os
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import JSONResponse
 
 from data.market_service import MarketService, MarketReport
-from data.fred import FREDClient, MacroSnapshot, MortgageRates
-from data.hud import HUDClient, FairMarketRents
-from data.census import CensusClient, DemographicProfile
+from data.fred import FREDClient, MacroSnapshot
+from data.hud import HUDClient
+from data.census import CensusClient
 
 router = APIRouter(prefix="/api/market", tags=["market research"])
 
@@ -37,12 +36,19 @@ def _get_service() -> MarketService:
 # Full market reports
 # ---------------------------------------------------------------------------
 
+
 @router.get("/metro/{metro}", summary="Market report for a metro area")
 async def market_report_metro(
     metro: str,
-    state_fips: Optional[str] = Query(None, description="2-digit state FIPS (e.g., '48' for TX)"),
-    county_fips: Optional[str] = Query(None, description="3-digit county FIPS (e.g., '453')"),
-    fips_code: Optional[str] = Query(None, description="5-digit combined FIPS (e.g., '48453')"),
+    state_fips: Optional[str] = Query(
+        None, description="2-digit state FIPS (e.g., '48' for TX)"
+    ),
+    county_fips: Optional[str] = Query(
+        None, description="3-digit county FIPS (e.g., '453')"
+    ),
+    fips_code: Optional[str] = Query(
+        None, description="5-digit combined FIPS (e.g., '48453')"
+    ),
 ) -> dict:
     """
     Fetch a complete market intelligence report for a metro area.
@@ -60,7 +66,8 @@ async def market_report_metro(
             metro=metro,
             state_fips=state_fips,
             county_fips=county_fips,
-            fips_code=fips_code or (f"{state_fips}{county_fips}" if state_fips and county_fips else None),
+            fips_code=fips_code
+            or (f"{state_fips}{county_fips}" if state_fips and county_fips else None),
         )
         return _serialize_report(report)
     except Exception as e:
@@ -81,7 +88,9 @@ async def market_report_zip(zipcode: str) -> dict:
         raise HTTPException(status_code=422, detail="zipcode must be a 5-digit number")
     try:
         service = _get_service()
-        report = await service.get_market_report(metro=f"ZIP {zipcode}", zipcode=zipcode)
+        report = await service.get_market_report(
+            metro=f"ZIP {zipcode}", zipcode=zipcode
+        )
         return _serialize_report(report)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -102,7 +111,9 @@ async def market_report_county(fips_code: str) -> dict:
     - 48201 — Harris County (Houston), TX
     """
     if len(fips_code) != 5 or not fips_code.isdigit():
-        raise HTTPException(status_code=422, detail="fips_code must be a 5-digit number")
+        raise HTTPException(
+            status_code=422, detail="fips_code must be a 5-digit number"
+        )
 
     state_fips = fips_code[:2]
     county_fips = fips_code[2:]
@@ -123,6 +134,7 @@ async def market_report_county(fips_code: str) -> dict:
 # ---------------------------------------------------------------------------
 # Specialized endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.get("/macro", summary="Macroeconomic snapshot (FRED)")
 async def macro_snapshot() -> dict:
@@ -179,7 +191,10 @@ async def fair_market_rents(fips_code: str) -> dict:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/demographics/{state_fips}/{county_fips}", summary="Census demographics for a county")
+@router.get(
+    "/demographics/{state_fips}/{county_fips}",
+    summary="Census demographics for a county",
+)
 async def demographics(state_fips: str, county_fips: str) -> dict:
     """
     Get Census ACS demographic profile for a county.
@@ -222,6 +237,7 @@ async def sample_market_report() -> dict:
 # Serialization helpers
 # ---------------------------------------------------------------------------
 
+
 def _serialize(obj) -> dict:
     """Convert a dataclass to a serializable dict, stripping None values."""
     if hasattr(obj, "__dict__"):
@@ -234,10 +250,17 @@ def _serialize_report(report: MarketReport) -> dict:
     result = {}
 
     for field_name in [
-        "market", "geography_type", "market_score", "market_grade",
-        "investment_thesis", "key_tailwinds", "key_headwinds",
-        "suggested_rent_growth", "suggested_exit_cap_range",
-        "data_sources", "warnings",
+        "market",
+        "geography_type",
+        "market_score",
+        "market_grade",
+        "investment_thesis",
+        "key_tailwinds",
+        "key_headwinds",
+        "suggested_rent_growth",
+        "suggested_exit_cap_range",
+        "data_sources",
+        "warnings",
     ]:
         val = getattr(report, field_name, None)
         if val is not None:

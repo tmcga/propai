@@ -25,6 +25,7 @@ def client():
 # Root & Health
 # ---------------------------------------------------------------------------
 
+
 class TestRoot:
     def test_root(self, client):
         resp = client.get("/")
@@ -42,6 +43,7 @@ class TestRoot:
 # ---------------------------------------------------------------------------
 # Underwriting Endpoints
 # ---------------------------------------------------------------------------
+
 
 class TestUnderwriting:
     def test_sample_deal(self, client):
@@ -94,6 +96,7 @@ class TestUnderwriting:
 # Screen Endpoints
 # ---------------------------------------------------------------------------
 
+
 class TestScreen:
     def test_screen_sample(self, client):
         resp = client.get("/api/screen/sample")
@@ -106,6 +109,7 @@ class TestScreen:
 # ---------------------------------------------------------------------------
 # LP Comms Endpoints
 # ---------------------------------------------------------------------------
+
 
 class TestLPComms:
     def test_lp_comms_sample(self, client):

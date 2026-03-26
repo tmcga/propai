@@ -61,7 +61,7 @@ export default function MemoPage() {
             <button
               className="btn-primary"
               disabled={generateMutation.isPending}
-              onClick={() => generateMemo && generateMutation.mutate(deal)}
+              onClick={() => generateMutation.mutate(deal)}
             >
               {generateMutation.isPending ? (
                 <>

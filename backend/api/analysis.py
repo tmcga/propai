@@ -15,7 +15,6 @@ from agents.document_parser import DocumentParser
 from agents.due_diligence import DueDiligenceAgent
 from agents.lp_comms import LPCommsAgent, LPCommsInput, AssetSnapshot
 from engine.financial.models import DealInput
-from engine.financial.proforma import ProFormaEngine
 
 router = APIRouter(prefix="/api", tags=["analysis"])
 
@@ -32,6 +31,7 @@ def _dc_to_dict(obj: Any) -> Any:
 
 
 # ── Deal Screener ─────────────────────────────────────────────────────────
+
 
 class ScreenRequest(BaseModel):
     asset_class: str = "multifamily"
@@ -121,6 +121,7 @@ async def screen_sample():
 
 # ── Document Parser ───────────────────────────────────────────────────────
 
+
 @router.post("/parse/document")
 async def parse_document(
     file: UploadFile = File(...),
@@ -137,7 +138,9 @@ async def parse_document(
             text = content.decode("utf-8")
         except UnicodeDecodeError:
             # Write to temp file for PDF extraction (ignore user-supplied filename for safety)
-            import tempfile, os
+            import tempfile
+            import os
+
             suffix = ".pdf" if file.content_type == "application/pdf" else ".txt"
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                 tmp.write(content)
@@ -173,10 +176,11 @@ async def parse_document_text(body: dict):
 
 # ── Due Diligence ─────────────────────────────────────────────────────────
 
+
 class DDRequest(BaseModel):
     deal: DealInput
-    t12_text: str | None = None          # raw T-12 text (will be parsed)
-    rent_roll_text: str | None = None    # raw rent roll text (will be parsed)
+    t12_text: str | None = None  # raw T-12 text (will be parsed)
+    rent_roll_text: str | None = None  # raw rent roll text (will be parsed)
     additional_docs: str = ""
 
 
@@ -212,6 +216,7 @@ async def run_due_diligence(req: DDRequest):
 
 
 # ── LP Communications ─────────────────────────────────────────────────────
+
 
 class AssetSnapshotRequest(BaseModel):
     property_name: str

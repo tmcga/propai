@@ -16,12 +16,12 @@ interface Props {
   data: ProFormaYear[];
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; color: string; value: number }>; label?: string }) => {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-navy-800 border border-navy-700 rounded-lg p-3 text-xs space-y-1 shadow-xl">
       <p className="font-semibold text-slate-200 mb-2">Year {label}</p>
-      {payload.map((p: any) => (
+      {payload.map((p) => (
         <div key={p.name} className="flex items-center justify-between gap-6">
           <span style={{ color: p.color }} className="text-slate-300">{p.name}</span>
           <span className="font-mono font-semibold" style={{ color: p.color }}>

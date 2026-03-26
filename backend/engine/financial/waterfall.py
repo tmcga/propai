@@ -16,7 +16,6 @@ This is the structure used by institutional RE private equity funds.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 from .dcf import irr as compute_irr, equity_multiple as compute_em
 from .models import EquityStructure, WaterfallResult, WaterfallTier
@@ -25,7 +24,8 @@ from .models import EquityStructure, WaterfallResult, WaterfallTier
 @dataclass
 class CashFlowSeries:
     """Raw cash flow series with timing for waterfall computation."""
-    periods: list[float]   # Annual cash flows, t=0 is negative (equity in)
+
+    periods: list[float]  # Annual cash flows, t=0 is negative (equity in)
 
 
 class WaterfallEngine:
@@ -98,14 +98,16 @@ class WaterfallEngine:
         gp_total += gp_roc
         remaining -= roc
 
-        tiers.append(WaterfallTier(
-            tier_name="Return of Capital",
-            irr_hurdle=None,
-            lp_distributions=round(lp_roc, 2),
-            gp_distributions=round(gp_roc, 2),
-            lp_split=structure.lp_equity_pct,
-            gp_split=structure.gp_equity_pct,
-        ))
+        tiers.append(
+            WaterfallTier(
+                tier_name="Return of Capital",
+                irr_hurdle=None,
+                lp_distributions=round(lp_roc, 2),
+                gp_distributions=round(gp_roc, 2),
+                lp_split=structure.lp_equity_pct,
+                gp_split=structure.gp_equity_pct,
+            )
+        )
 
         if remaining <= 0:
             return self._build_result(lp_total, gp_total, tiers)
@@ -124,14 +126,16 @@ class WaterfallEngine:
         lp_total += pref_paid
         remaining -= pref_paid
 
-        tiers.append(WaterfallTier(
-            tier_name=f"LP Preferred Return ({structure.preferred_return:.0%})",
-            irr_hurdle=structure.preferred_return,
-            lp_distributions=round(pref_paid, 2),
-            gp_distributions=0.0,
-            lp_split=1.0,
-            gp_split=0.0,
-        ))
+        tiers.append(
+            WaterfallTier(
+                tier_name=f"LP Preferred Return ({structure.preferred_return:.0%})",
+                irr_hurdle=structure.preferred_return,
+                lp_distributions=round(pref_paid, 2),
+                gp_distributions=0.0,
+                lp_split=1.0,
+                gp_split=0.0,
+            )
+        )
 
         if remaining <= 0:
             return self._build_result(lp_total, gp_total, tiers)
@@ -139,7 +143,6 @@ class WaterfallEngine:
         # ── Tier 3: GP Catch-Up (optional) ────────────────────────────
         if self.gp_catch_up and remaining > 0:
             # GP catches up until it has received gp_catch_up_pct of total distributions so far
-            total_so_far = lp_total + gp_total
             target_gp = (lp_total + gp_total + remaining) * self.gp_catch_up_pct
             catch_up_needed = max(0.0, target_gp - gp_total)
             catch_up_paid = min(remaining, catch_up_needed)
@@ -147,14 +150,16 @@ class WaterfallEngine:
             if catch_up_paid > 0:
                 gp_total += catch_up_paid
                 remaining -= catch_up_paid
-                tiers.append(WaterfallTier(
-                    tier_name="GP Catch-Up",
-                    irr_hurdle=None,
-                    lp_distributions=0.0,
-                    gp_distributions=round(catch_up_paid, 2),
-                    lp_split=0.0,
-                    gp_split=1.0,
-                ))
+                tiers.append(
+                    WaterfallTier(
+                        tier_name="GP Catch-Up",
+                        irr_hurdle=None,
+                        lp_distributions=0.0,
+                        gp_distributions=round(catch_up_paid, 2),
+                        lp_split=0.0,
+                        gp_split=1.0,
+                    )
+                )
 
         if remaining <= 0:
             return self._build_result(lp_total, gp_total, tiers)
@@ -167,8 +172,6 @@ class WaterfallEngine:
         # For simplicity, split residual based on the highest hurdle
         # that the LP IRR clears. In a rigorous implementation this
         # would be computed iteratively.
-        lp_irr_est = self._estimate_lp_irr(lp_total, pref_paid)
-
         for i, hurdle in enumerate(structure.promote_hurdles):
             if remaining <= 0:
                 break
@@ -194,14 +197,16 @@ class WaterfallEngine:
             gp_total += gp_tier
             remaining -= tier_amount
 
-            tiers.append(WaterfallTier(
-                tier_name=tier_name,
-                irr_hurdle=hurdle,
-                lp_distributions=round(lp_tier, 2),
-                gp_distributions=round(gp_tier, 2),
-                lp_split=lp_split,
-                gp_split=gp_promote,
-            ))
+            tiers.append(
+                WaterfallTier(
+                    tier_name=tier_name,
+                    irr_hurdle=hurdle,
+                    lp_distributions=round(lp_tier, 2),
+                    gp_distributions=round(gp_tier, 2),
+                    lp_split=lp_split,
+                    gp_split=gp_promote,
+                )
+            )
 
         # Any truly residual amount (shouldn't happen in practice)
         if remaining > 1.0:

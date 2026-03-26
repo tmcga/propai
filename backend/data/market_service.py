@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from .census import CensusClient, DemographicProfile
-from .fred import FREDClient, MacroSnapshot, MortgageRates
+from .fred import FREDClient, MacroSnapshot
 from .hud import HUDClient, FairMarketRents
 from .zillow import ZillowClient, ZillowMetrics
 
@@ -39,7 +39,9 @@ class RentBenchmarks:
     zori_trend: Optional[str] = None
 
     # Derived
-    implied_rent_growth_assumption: Optional[float] = None  # Suggested underwriting assumption
+    implied_rent_growth_assumption: Optional[float] = (
+        None  # Suggested underwriting assumption
+    )
     rent_environment: Optional[str] = None  # "strong", "moderate", "softening"
 
 
@@ -66,12 +68,12 @@ class MarketReport:
     rent_benchmarks: Optional[RentBenchmarks] = None
 
     # Synthesized signals (derived from all sources)
-    market_score: Optional[int] = None           # 1–100 composite score
-    market_grade: Optional[str] = None           # "A+", "A", "B+", "B", "C", "D"
-    investment_thesis: Optional[str] = None      # 2–3 sentence AI-ready summary
+    market_score: Optional[int] = None  # 1–100 composite score
+    market_grade: Optional[str] = None  # "A+", "A", "B+", "B", "C", "D"
+    investment_thesis: Optional[str] = None  # 2–3 sentence AI-ready summary
     key_tailwinds: list[str] = field(default_factory=list)
     key_headwinds: list[str] = field(default_factory=list)
-    suggested_rent_growth: Optional[float] = None   # Suggested underwriting assumption
+    suggested_rent_growth: Optional[float] = None  # Suggested underwriting assumption
     suggested_exit_cap_range: Optional[tuple] = None  # (low, high) range
 
     warnings: list[str] = field(default_factory=list)
@@ -111,7 +113,7 @@ class MarketService:
         metro: str,
         state_fips: Optional[str] = None,
         county_fips: Optional[str] = None,
-        fips_code: Optional[str] = None,   # Combined state+county (5 digits)
+        fips_code: Optional[str] = None,  # Combined state+county (5 digits)
         zipcode: Optional[str] = None,
     ) -> MarketReport:
         """
@@ -162,7 +164,9 @@ class MarketService:
 
         for (source_name, _), result in zip(tasks, results):
             if isinstance(result, Exception):
-                report.warnings.append(f"{source_name} data fetch failed: {str(result)}")
+                report.warnings.append(
+                    f"{source_name} data fetch failed: {str(result)}"
+                )
                 logger.warning(f"MarketService {source_name} failed: {result}")
             else:
                 if source_name == "macro":
@@ -202,7 +206,9 @@ class MarketService:
         async with ZillowClient() as client:
             return await client.get_zip_metrics(zipcode)
 
-    async def _fetch_census_county(self, state_fips: str, county_fips: str) -> DemographicProfile:
+    async def _fetch_census_county(
+        self, state_fips: str, county_fips: str
+    ) -> DemographicProfile:
         async with CensusClient(api_key=self.census_key) as client:
             return await client.get_county_profile(state_fips, county_fips)
 
@@ -287,12 +293,16 @@ class MarketService:
         if demo and demo.median_household_income:
             hhi = demo.median_household_income
             if hhi > 80_000:
-                tailwinds.append(f"High median household income (${hhi:,}) supports strong rent-paying capacity.")
+                tailwinds.append(
+                    f"High median household income (${hhi:,}) supports strong rent-paying capacity."
+                )
                 score_components.append(75)
             elif hhi > 60_000:
                 score_components.append(60)
             else:
-                headwinds.append(f"Below-average median income (${hhi:,}) may limit rent growth.")
+                headwinds.append(
+                    f"Below-average median income (${hhi:,}) may limit rent growth."
+                )
                 score_components.append(40)
 
         # ── Rent growth (Zillow ZORI) ─────────────────────────────────
@@ -307,28 +317,38 @@ class MarketService:
             elif yoy > 0:
                 score_components.append(50)
             else:
-                headwinds.append(f"Rent growth is flat or negative ({yoy:.1f}% YoY) — monitor supply pipeline.")
+                headwinds.append(
+                    f"Rent growth is flat or negative ({yoy:.1f}% YoY) — monitor supply pipeline."
+                )
                 score_components.append(30)
 
         # ── Home value appreciation ───────────────────────────────────
         if z and z.zhvi_yoy_pct is not None:
             yoy = z.zhvi_yoy_pct
             if yoy > 5:
-                tailwinds.append(f"Home values appreciating {yoy:.1f}% YoY, supporting exit values.")
+                tailwinds.append(
+                    f"Home values appreciating {yoy:.1f}% YoY, supporting exit values."
+                )
                 score_components.append(80)
             elif yoy > 0:
                 score_components.append(60)
             else:
-                headwinds.append(f"Home values declining ({yoy:.1f}% YoY) — exit cap rate risk elevated.")
+                headwinds.append(
+                    f"Home values declining ({yoy:.1f}% YoY) — exit cap rate risk elevated."
+                )
                 score_components.append(35)
 
         # ── Macro rate environment ────────────────────────────────────
         if macro and macro.rate_environment:
             if macro.rate_environment == "accommodative":
-                tailwinds.append("Accommodative rate environment supports leveraged returns.")
+                tailwinds.append(
+                    "Accommodative rate environment supports leveraged returns."
+                )
                 score_components.append(80)
             elif macro.rate_environment == "restrictive":
-                headwinds.append(f"Restrictive rate environment ({macro.fed_funds_rate:.2f}% fed funds) compresses leveraged returns.")
+                headwinds.append(
+                    f"Restrictive rate environment ({macro.fed_funds_rate:.2f}% fed funds) compresses leveraged returns."
+                )
                 score_components.append(35)
             else:
                 score_components.append(55)
@@ -337,17 +357,23 @@ class MarketService:
         if demo and demo.vacancy_rate is not None:
             vac = demo.vacancy_rate
             if vac < 0.05:
-                tailwinds.append(f"Tight housing supply ({vac:.1%} vacancy rate) supports rent growth.")
+                tailwinds.append(
+                    f"Tight housing supply ({vac:.1%} vacancy rate) supports rent growth."
+                )
                 score_components.append(80)
             elif vac < 0.08:
                 score_components.append(60)
             else:
-                headwinds.append(f"Elevated vacancy rate ({vac:.1%}) may cap rent upside.")
+                headwinds.append(
+                    f"Elevated vacancy rate ({vac:.1%}) may cap rent upside."
+                )
                 score_components.append(35)
 
         # ── Education / workforce ─────────────────────────────────────
         if demo and demo.bachelors_plus_rate and demo.bachelors_plus_rate > 0.40:
-            tailwinds.append(f"Highly educated workforce ({demo.bachelors_plus_rate:.0%} college-educated) drives tech/professional job demand.")
+            tailwinds.append(
+                f"Highly educated workforce ({demo.bachelors_plus_rate:.0%} college-educated) drives tech/professional job demand."
+            )
             score_components.append(75)
 
         # ── Compute composite score ───────────────────────────────────

@@ -15,17 +15,18 @@ from pydantic import BaseModel, Field, model_validator
 # Enumerations
 # ---------------------------------------------------------------------------
 
+
 class AssetClass(str, Enum):
-    SFR = "sfr"                          # Single-Family Residential
+    SFR = "sfr"  # Single-Family Residential
     SMALL_MULTIFAMILY = "small_multifamily"  # 2–20 units
-    MULTIFAMILY = "multifamily"          # 20+ units
+    MULTIFAMILY = "multifamily"  # 20+ units
     OFFICE = "office"
     RETAIL = "retail"
     MIXED_USE = "mixed_use"
     INDUSTRIAL = "industrial"
     SELF_STORAGE = "self_storage"
-    STR = "str"                          # Short-Term Rental
-    GROUND_UP = "ground_up"             # New construction / development
+    STR = "str"  # Short-Term Rental
+    GROUND_UP = "ground_up"  # New construction / development
 
 
 class LoanType(str, Enum):
@@ -38,15 +39,26 @@ class LoanType(str, Enum):
 # Input Models
 # ---------------------------------------------------------------------------
 
+
 class LoanInput(BaseModel):
     """Debt financing assumptions."""
 
-    ltv: float = Field(0.70, ge=0.0, le=0.95, description="Loan-to-Value ratio (e.g., 0.70 = 70%)")
-    interest_rate: float = Field(0.065, ge=0.0, le=0.30, description="Annual interest rate")
-    amortization_years: int = Field(30, ge=1, le=40, description="Amortization period in years")
+    ltv: float = Field(
+        0.70, ge=0.0, le=0.95, description="Loan-to-Value ratio (e.g., 0.70 = 70%)"
+    )
+    interest_rate: float = Field(
+        0.065, ge=0.0, le=0.30, description="Annual interest rate"
+    )
+    amortization_years: int = Field(
+        30, ge=1, le=40, description="Amortization period in years"
+    )
     loan_type: LoanType = Field(LoanType.FIXED, description="Loan structure")
-    io_period_years: int = Field(0, ge=0, le=10, description="Interest-only period (for IO_THEN_AMORTIZING)")
-    origination_fee: float = Field(0.01, ge=0.0, le=0.05, description="Loan origination fee as % of loan amount")
+    io_period_years: int = Field(
+        0, ge=0, le=10, description="Interest-only period (for IO_THEN_AMORTIZING)"
+    )
+    origination_fee: float = Field(
+        0.01, ge=0.0, le=0.05, description="Loan origination fee as % of loan amount"
+    )
 
     @model_validator(mode="after")
     def validate_io_period(self) -> "LoanInput":
@@ -59,47 +71,84 @@ class OperatingAssumptions(BaseModel):
     """Revenue and expense assumptions for stabilized operations."""
 
     # Revenue
-    gross_scheduled_income: float = Field(..., gt=0, description="Annual gross scheduled rental income (Year 1)")
-    vacancy_rate: float = Field(0.05, ge=0.0, le=0.50, description="Physical vacancy rate")
-    credit_loss_rate: float = Field(0.01, ge=0.0, le=0.20, description="Credit loss / bad debt rate")
-    other_income: float = Field(0.0, ge=0.0, description="Other annual income (parking, laundry, fees)")
+    gross_scheduled_income: float = Field(
+        ..., gt=0, description="Annual gross scheduled rental income (Year 1)"
+    )
+    vacancy_rate: float = Field(
+        0.05, ge=0.0, le=0.50, description="Physical vacancy rate"
+    )
+    credit_loss_rate: float = Field(
+        0.01, ge=0.0, le=0.20, description="Credit loss / bad debt rate"
+    )
+    other_income: float = Field(
+        0.0, ge=0.0, description="Other annual income (parking, laundry, fees)"
+    )
 
     # Expenses (annual, Year 1)
     property_taxes: float = Field(..., ge=0.0, description="Annual property taxes")
     insurance: float = Field(..., ge=0.0, description="Annual property insurance")
-    management_fee_pct: float = Field(0.05, ge=0.0, le=0.20, description="Management fee as % of EGI")
-    maintenance_reserves: float = Field(..., ge=0.0, description="Annual maintenance & repairs")
-    capex_reserves: float = Field(0.0, ge=0.0, description="Annual CapEx / replacement reserves")
+    management_fee_pct: float = Field(
+        0.05, ge=0.0, le=0.20, description="Management fee as % of EGI"
+    )
+    maintenance_reserves: float = Field(
+        ..., ge=0.0, description="Annual maintenance & repairs"
+    )
+    capex_reserves: float = Field(
+        0.0, ge=0.0, description="Annual CapEx / replacement reserves"
+    )
     utilities: float = Field(0.0, ge=0.0, description="Annual utilities paid by owner")
-    other_expenses: float = Field(0.0, ge=0.0, description="Other annual operating expenses")
+    other_expenses: float = Field(
+        0.0, ge=0.0, description="Other annual operating expenses"
+    )
 
     # Growth rates
-    rent_growth_rate: float = Field(0.03, ge=-0.10, le=0.20, description="Annual rent growth rate")
-    expense_growth_rate: float = Field(0.02, ge=-0.05, le=0.15, description="Annual expense growth rate")
+    rent_growth_rate: float = Field(
+        0.03, ge=-0.10, le=0.20, description="Annual rent growth rate"
+    )
+    expense_growth_rate: float = Field(
+        0.02, ge=-0.05, le=0.15, description="Annual expense growth rate"
+    )
 
 
 class ExitAssumptions(BaseModel):
     """Hold period and disposition assumptions."""
 
-    hold_period_years: int = Field(5, ge=1, le=30, description="Investment hold period in years")
-    exit_cap_rate: float = Field(..., gt=0.0, le=0.30, description="Cap rate applied to exit NOI")
-    selling_costs_pct: float = Field(0.03, ge=0.0, le=0.10, description="Selling costs as % of sale price (broker, transfer tax, etc.)")
-    discount_rate: float = Field(0.08, ge=0.01, le=0.50, description="Discount rate for NPV calculation")
+    hold_period_years: int = Field(
+        5, ge=1, le=30, description="Investment hold period in years"
+    )
+    exit_cap_rate: float = Field(
+        ..., gt=0.0, le=0.30, description="Cap rate applied to exit NOI"
+    )
+    selling_costs_pct: float = Field(
+        0.03,
+        ge=0.0,
+        le=0.10,
+        description="Selling costs as % of sale price (broker, transfer tax, etc.)",
+    )
+    discount_rate: float = Field(
+        0.08, ge=0.01, le=0.50, description="Discount rate for NPV calculation"
+    )
 
 
 class EquityStructure(BaseModel):
     """LP/GP equity split and waterfall parameters."""
 
-    lp_equity_pct: float = Field(0.90, ge=0.0, le=1.0, description="LP share of total equity (e.g., 0.90 = 90%)")
-    gp_equity_pct: float = Field(0.10, ge=0.0, le=1.0, description="GP co-invest share of total equity")
-    preferred_return: float = Field(0.08, ge=0.0, le=0.30, description="LP preferred return (annual)")
+    lp_equity_pct: float = Field(
+        0.90, ge=0.0, le=1.0, description="LP share of total equity (e.g., 0.90 = 90%)"
+    )
+    gp_equity_pct: float = Field(
+        0.10, ge=0.0, le=1.0, description="GP co-invest share of total equity"
+    )
+    preferred_return: float = Field(
+        0.08, ge=0.0, le=0.30, description="LP preferred return (annual)"
+    )
     promote_hurdles: list[float] = Field(
         default=[0.08, 0.12, 0.15],
-        description="IRR hurdles at which GP promote increases"
+        description="IRR hurdles at which GP promote increases",
     )
     promote_splits: list[float] = Field(
         default=[0.20, 0.30, 0.40],
-        description="GP promote % above each IRR hurdle (same length as hurdles)"
+        description="GP promote % above each IRR hurdle (same length as hurdles)",
     )
 
     @model_validator(mode="after")
@@ -107,7 +156,9 @@ class EquityStructure(BaseModel):
         if abs(self.lp_equity_pct + self.gp_equity_pct - 1.0) > 0.001:
             raise ValueError("lp_equity_pct + gp_equity_pct must equal 1.0")
         if len(self.promote_hurdles) != len(self.promote_splits):
-            raise ValueError("promote_hurdles and promote_splits must have the same length")
+            raise ValueError(
+                "promote_hurdles and promote_splits must have the same length"
+            )
         return self
 
 
@@ -118,20 +169,30 @@ class DealInput(BaseModel):
     name: str = Field(..., description="Deal name / property address")
     asset_class: AssetClass = Field(..., description="Property type")
     purchase_price: float = Field(..., gt=0, description="Purchase price")
-    square_feet: Optional[float] = Field(None, ge=0, description="Total rentable square footage")
-    units: Optional[int] = Field(None, ge=1, description="Number of units (multifamily/STR)")
+    square_feet: Optional[float] = Field(
+        None, ge=0, description="Total rentable square footage"
+    )
+    units: Optional[int] = Field(
+        None, ge=1, description="Number of units (multifamily/STR)"
+    )
     year_built: Optional[int] = Field(None, description="Year property was built")
     market: Optional[str] = Field(None, description="City/MSA (e.g., 'Austin, TX')")
 
     # Closing costs & immediate CapEx
-    closing_costs: float = Field(0.01, ge=0.0, le=0.10, description="Closing costs as % of purchase price")
-    immediate_capex: float = Field(0.0, ge=0.0, description="Immediate CapEx / renovation budget at acquisition")
+    closing_costs: float = Field(
+        0.01, ge=0.0, le=0.10, description="Closing costs as % of purchase price"
+    )
+    immediate_capex: float = Field(
+        0.0, ge=0.0, description="Immediate CapEx / renovation budget at acquisition"
+    )
 
     # Sub-models
-    loan: LoanInput = Field(default_factory=LoanInput)
+    loan: LoanInput = Field(default_factory=LoanInput)  # type: ignore[arg-type]
     operations: OperatingAssumptions
     exit: ExitAssumptions
-    equity_structure: Optional[EquityStructure] = Field(None, description="LP/GP structure (optional)")
+    equity_structure: Optional[EquityStructure] = Field(
+        None, description="LP/GP structure (optional)"
+    )
 
     @property
     def loan_amount(self) -> float:
@@ -146,12 +207,18 @@ class DealInput(BaseModel):
 
     @property
     def total_project_cost(self) -> float:
-        return self.purchase_price + (self.purchase_price * self.closing_costs) + self.immediate_capex + (self.loan_amount * self.loan.origination_fee)
+        return (
+            self.purchase_price
+            + (self.purchase_price * self.closing_costs)
+            + self.immediate_capex
+            + (self.loan_amount * self.loan.origination_fee)
+        )
 
 
 # ---------------------------------------------------------------------------
 # Output Models
 # ---------------------------------------------------------------------------
+
 
 class ProFormaYear(BaseModel):
     """Financial results for a single year in the pro forma."""
@@ -193,10 +260,14 @@ class ReturnMetrics(BaseModel):
     # Stabilized metrics (Year 1)
     going_in_cap_rate: float = Field(description="Year 1 NOI / Purchase Price")
     cash_on_cash_yr1: float = Field(description="Year 1 BTCF / Total Equity")
-    gross_rent_multiplier: float = Field(description="Purchase Price / Gross Annual Rent")
+    gross_rent_multiplier: float = Field(
+        description="Purchase Price / Gross Annual Rent"
+    )
     dscr_yr1: float = Field(description="Year 1 NOI / Annual Debt Service")
     operating_expense_ratio: float = Field(description="Total OpEx / EGI")
-    break_even_occupancy: float = Field(description="Occupancy needed to cover all cash obligations")
+    break_even_occupancy: float = Field(
+        description="Occupancy needed to cover all cash obligations"
+    )
 
     # Price per unit / per SF
     price_per_unit: Optional[float] = None
@@ -204,12 +275,20 @@ class ReturnMetrics(BaseModel):
     noi_per_unit: Optional[float] = None
 
     # Total hold period returns
-    irr: float = Field(description="Project-level IRR (unleveraged if no debt, levered otherwise)")
+    irr: float = Field(
+        description="Project-level IRR (unleveraged if no debt, levered otherwise)"
+    )
     levered_irr: float = Field(description="Equity / levered IRR")
-    equity_multiple: float = Field(description="Total distributions / total equity invested")
+    equity_multiple: float = Field(
+        description="Total distributions / total equity invested"
+    )
     npv: float = Field(description="Net Present Value at given discount rate")
-    average_cash_on_cash: float = Field(description="Average annual cash-on-cash over hold period")
-    total_profit: float = Field(description="Total profit (distributions minus equity invested)")
+    average_cash_on_cash: float = Field(
+        description="Average annual cash-on-cash over hold period"
+    )
+    total_profit: float = Field(
+        description="Total profit (distributions minus equity invested)"
+    )
 
     # Exit
     exit_price: float
@@ -226,7 +305,7 @@ class SensitivityTable(BaseModel):
     col_label: str  # e.g., "Rent Growth"
     row_values: list[float]
     col_values: list[float]
-    metric: str     # e.g., "levered_irr"
+    metric: str  # e.g., "levered_irr"
     data: list[list[float]]  # [row][col] → metric value
 
 

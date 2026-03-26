@@ -25,7 +25,12 @@ from typing import Optional
 from pathlib import Path
 
 import anthropic
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +41,7 @@ TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
 # ---------------------------------------------------------------------------
 # Output model
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class InvestmentMemo:
@@ -53,11 +59,11 @@ class InvestmentMemo:
 
     # AI-generated narrative sections
     executive_summary: str = ""
-    investment_highlights: str = ""        # Bullet-point key metrics narrative
+    investment_highlights: str = ""  # Bullet-point key metrics narrative
     property_overview: str = ""
     market_analysis: str = ""
     investment_thesis: str = ""
-    financial_summary: str = ""            # Narrative around the numbers
+    financial_summary: str = ""  # Narrative around the numbers
     risk_factors: str = ""
     exit_strategy: str = ""
 
@@ -92,7 +98,6 @@ Use markdown formatting where appropriate (bold for emphasis, bullet lists for r
 """
 
 SECTION_PROMPTS = {
-
     "executive_summary": """Write a 3-4 paragraph executive summary for this real estate investment opportunity.
 
 Cover:
@@ -108,7 +113,6 @@ Market Context:
 {market_context}
 
 Write the executive summary now:""",
-
     "investment_highlights": """Write a structured Investment Highlights section listing the 5-7 most compelling reasons to invest.
 
 Format as bold headers with 1-2 sentence explanations. Focus on:
@@ -125,7 +129,6 @@ Market Context:
 {market_context}
 
 Write the investment highlights now:""",
-
     "market_analysis": """Write a Market Analysis section (3-4 paragraphs) covering:
 
 1. Macro backdrop: interest rate environment and its impact on RE valuations
@@ -143,7 +146,6 @@ Market Data:
 {market_context}
 
 Write the market analysis now:""",
-
     "investment_thesis": """Write the Investment Thesis section (2-3 paragraphs).
 
 This is the core argument for why this investment creates value. Cover:
@@ -160,7 +162,6 @@ Market Context:
 {market_context}
 
 Write the investment thesis now:""",
-
     "financial_summary": """Write a Financial Summary narrative (2-3 paragraphs) that interprets the numbers.
 
 Don't just repeat the figures — explain what they mean:
@@ -177,7 +178,6 @@ Market context for benchmarking:
 {market_context}
 
 Write the financial summary narrative now:""",
-
     "risk_factors": """Write a Risk Factors section listing the 4-6 most significant risks with mitigants.
 
 Format each risk as:
@@ -199,7 +199,6 @@ Market Context:
 {market_context}
 
 Write the risk factors now:""",
-
     "exit_strategy": """Write an Exit Strategy section (1-2 paragraphs) covering:
 
 1. Primary exit path (sale to institutional buyer, 1031 exchange buyer, individual investor, etc.)
@@ -221,6 +220,7 @@ Write the exit strategy now:""",
 # ---------------------------------------------------------------------------
 # Memo Agent
 # ---------------------------------------------------------------------------
+
 
 class MemoAgent:
     """
@@ -261,9 +261,9 @@ class MemoAgent:
 
     async def generate(
         self,
-        underwriting_result,   # UnderwritingResult
-        deal_input,            # DealInput
-        market_report=None,    # Optional[MarketReport]
+        underwriting_result,  # UnderwritingResult
+        deal_input,  # DealInput
+        market_report=None,  # Optional[MarketReport]
         sections: Optional[list[str]] = None,
     ) -> InvestmentMemo:
         """
@@ -279,6 +279,7 @@ class MemoAgent:
             InvestmentMemo with all sections populated
         """
         import time
+
         start = time.perf_counter()
 
         memo = InvestmentMemo(
@@ -300,7 +301,9 @@ class MemoAgent:
         if underwriting_result.irr_sensitivity:
             memo.sensitivity_data = {
                 "irr": underwriting_result.irr_sensitivity.__dict__,
-                "coc": underwriting_result.coc_sensitivity.__dict__ if underwriting_result.coc_sensitivity else None,
+                "coc": underwriting_result.coc_sensitivity.__dict__
+                if underwriting_result.coc_sensitivity
+                else None,
             }
 
         # Sections to generate
@@ -366,7 +369,13 @@ class MemoAgent:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
-        retry=retry_if_exception_type((anthropic.APITimeoutError, anthropic.RateLimitError, anthropic.InternalServerError)),
+        retry=retry_if_exception_type(
+            (
+                anthropic.APITimeoutError,
+                anthropic.RateLimitError,
+                anthropic.InternalServerError,
+            )
+        ),
         reraise=True,
     )
     async def _call_api(self, client: anthropic.AsyncAnthropic, prompt: str):
@@ -430,7 +439,7 @@ class MemoAgent:
             f"Annual Rent Growth: {deal.operations.rent_growth_rate:.1%}",
             f"Annual Expense Growth: {deal.operations.expense_growth_rate:.1%}",
         ]
-        return "\n".join(l for l in lines if l is not None)
+        return "\n".join(line for line in lines if line is not None)
 
     def _build_market_context(self, market_report) -> str:
         """Serialize market report into LLM context."""
@@ -496,7 +505,9 @@ class MemoAgent:
             macro = market_report.macro
             lines += ["", "MACRO ENVIRONMENT (FRED)"]
             if macro.mortgage_rates and macro.mortgage_rates.rate_30yr:
-                lines.append(f"30-Yr Fixed Mortgage Rate: {macro.mortgage_rates.rate_30yr:.2f}%")
+                lines.append(
+                    f"30-Yr Fixed Mortgage Rate: {macro.mortgage_rates.rate_30yr:.2f}%"
+                )
             if macro.fed_funds_rate:
                 lines.append(f"Fed Funds Rate: {macro.fed_funds_rate:.2f}%")
             if macro.treasury_10yr:
@@ -547,18 +558,20 @@ class MemoAgent:
 
     def _build_exit_context(self, result, deal) -> str:
         m = result.metrics
-        return "\n".join([
-            f"Hold Period: {deal.exit.hold_period_years} years",
-            f"Going-In Cap Rate: {m.going_in_cap_rate:.2%}",
-            f"Exit Cap Rate Assumption: {deal.exit.exit_cap_rate:.2%}",
-            f"Cap Rate Delta: {deal.exit.exit_cap_rate - m.going_in_cap_rate:+.2%} "
-            f"({'compression' if deal.exit.exit_cap_rate < m.going_in_cap_rate else 'expansion'})",
-            f"Exit NOI: ${m.exit_noi:,.0f}",
-            f"Gross Exit Price: ${m.exit_price:,.0f}",
-            f"Selling Costs: {deal.exit.selling_costs_pct:.1%}",
-            f"Net Sale Proceeds to Equity: ${m.net_sale_proceeds:,.0f}",
-            f"Total Equity Distributions: ${m.total_equity_distributions:,.0f}",
-        ])
+        return "\n".join(
+            [
+                f"Hold Period: {deal.exit.hold_period_years} years",
+                f"Going-In Cap Rate: {m.going_in_cap_rate:.2%}",
+                f"Exit Cap Rate Assumption: {deal.exit.exit_cap_rate:.2%}",
+                f"Cap Rate Delta: {deal.exit.exit_cap_rate - m.going_in_cap_rate:+.2%} "
+                f"({'compression' if deal.exit.exit_cap_rate < m.going_in_cap_rate else 'expansion'})",
+                f"Exit NOI: ${m.exit_noi:,.0f}",
+                f"Gross Exit Price: ${m.exit_price:,.0f}",
+                f"Selling Costs: {deal.exit.selling_costs_pct:.1%}",
+                f"Net Sale Proceeds to Equity: ${m.net_sale_proceeds:,.0f}",
+                f"Total Equity Distributions: ${m.total_equity_distributions:,.0f}",
+            ]
+        )
 
     def _build_warnings_context(self, result) -> str:
         if not result.warnings:
@@ -569,20 +582,23 @@ class MemoAgent:
         """Build a clean pro forma table for HTML rendering."""
         rows = []
         for yr in result.pro_forma:
-            rows.append({
-                "year": yr.year,
-                "gsi": yr.gross_scheduled_income,
-                "vacancy_loss": yr.vacancy_loss,
-                "egi": yr.effective_gross_income,
-                "total_opex": yr.total_operating_expenses,
-                "noi": yr.net_operating_income,
-                "debt_service": yr.debt_service,
-                "btcf": yr.before_tax_cash_flow,
-                "loan_balance": yr.loan_balance,
-            })
+            rows.append(
+                {
+                    "year": yr.year,
+                    "gsi": yr.gross_scheduled_income,
+                    "vacancy_loss": yr.vacancy_loss,
+                    "egi": yr.effective_gross_income,
+                    "total_opex": yr.total_operating_expenses,
+                    "noi": yr.net_operating_income,
+                    "debt_service": yr.debt_service,
+                    "btcf": yr.before_tax_cash_flow,
+                    "loan_balance": yr.loan_balance,
+                }
+            )
         return rows
 
     @staticmethod
     def _today() -> str:
         from datetime import date
+
         return date.today().strftime("%B %d, %Y")

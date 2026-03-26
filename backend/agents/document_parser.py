@@ -24,26 +24,37 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from anthropic import AsyncAnthropic, APITimeoutError, RateLimitError, InternalServerError
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-
-logger = logging.getLogger(__name__)
+from anthropic import (
+    AsyncAnthropic,
+    APITimeoutError,
+    RateLimitError,
+    InternalServerError,
+)
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+)
 
 from engine.financial.models import (
-    AssetClass,
     DealInput,
     ExitAssumptions,
     LoanInput,
     OperatingAssumptions,
 )
 
+logger = logging.getLogger(__name__)
+
 
 # ── Text extraction ───────────────────────────────────────────────────────
+
 
 def extract_text_from_pdf(path: str | Path) -> str:
     """Extract raw text from a PDF file. Requires pdfminer.six."""
     try:
         from pdfminer.high_level import extract_text
+
         return extract_text(str(path))
     except ImportError:
         raise ImportError(
@@ -57,24 +68,25 @@ def extract_text_from_pdf(path: str | Path) -> str:
 def clean_text(text: str) -> str:
     """Normalize extracted PDF text for LLM consumption."""
     # Collapse excessive whitespace
-    text = re.sub(r'\n{3,}', '\n\n', text)
-    text = re.sub(r' {2,}', ' ', text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = re.sub(r" {2,}", " ", text)
     # Remove null bytes and control chars
-    text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', text)
+    text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", text)
     return text.strip()
 
 
 # ── Output types ──────────────────────────────────────────────────────────
 
+
 @dataclass
 class RentRollUnit:
     unit_id: str
-    unit_type: str          # "1BR/1BA", "Studio", etc.
+    unit_type: str  # "1BR/1BA", "Studio", etc.
     square_feet: float | None
-    market_rent: float      # monthly asking rent
-    actual_rent: float      # monthly rent actually collected (0 if vacant)
+    market_rent: float  # monthly asking rent
+    actual_rent: float  # monthly rent actually collected (0 if vacant)
     occupied: bool
-    lease_end: str | None   # "2025-06", "MTM", etc.
+    lease_end: str | None  # "2025-06", "MTM", etc.
     notes: str = ""
 
 
@@ -83,10 +95,10 @@ class RentRollSummary:
     total_units: int
     occupied_units: int
     physical_vacancy: float
-    scheduled_income_annual: float      # market rents × 12
-    actual_income_annual: float         # actual rents × 12 (occupied only)
-    loss_to_lease: float                # scheduled - actual (occupied units)
-    unit_mix: list[dict]                # {"type": "1BR", "count": 12, "avg_rent": 1800}
+    scheduled_income_annual: float  # market rents × 12
+    actual_income_annual: float  # actual rents × 12 (occupied only)
+    loss_to_lease: float  # scheduled - actual (occupied units)
+    unit_mix: list[dict]  # {"type": "1BR", "count": 12, "avg_rent": 1800}
     units: list[RentRollUnit] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
 
@@ -94,6 +106,7 @@ class RentRollSummary:
 @dataclass
 class T12Summary:
     """Parsed trailing-12 income statement."""
+
     # Income
     gross_scheduled_income: float
     vacancy_loss: float
@@ -117,7 +130,7 @@ class T12Summary:
     net_operating_income: float
 
     # Flags
-    annualized: bool = False        # True if only partial year was provided
+    annualized: bool = False  # True if only partial year was provided
     months_of_data: int = 12
     red_flags: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
@@ -125,15 +138,15 @@ class T12Summary:
 
 @dataclass
 class ParsedDocument:
-    doc_type: str                           # "om", "t12", "rent_roll", "mixed"
-    deal_input: DealInput | None            # populated for OM and mixed
-    t12: T12Summary | None                  # populated for T12 and OM
-    rent_roll: RentRollSummary | None       # populated for rent rolls
+    doc_type: str  # "om", "t12", "rent_roll", "mixed"
+    deal_input: DealInput | None  # populated for OM and mixed
+    t12: T12Summary | None  # populated for T12 and OM
+    rent_roll: RentRollSummary | None  # populated for rent rolls
     extracted_values: dict[str, Any] = field(default_factory=dict)
     assumed_values: dict[str, Any] = field(default_factory=dict)
     missing_critical: list[str] = field(default_factory=list)
     red_flags: list[str] = field(default_factory=list)
-    confidence: str = "MEDIUM"             # HIGH / MEDIUM / LOW
+    confidence: str = "MEDIUM"  # HIGH / MEDIUM / LOW
     raw_text_chars: int = 0
 
 
@@ -170,11 +183,31 @@ Flag:
 
 
 class DocumentParser:
-
     def __init__(self) -> None:
         self.client = AsyncAnthropic()
 
-    async def parse_file(self, path: str | Path, doc_type_hint: str = "auto") -> ParsedDocument:
+    async def parse_bytes(
+        self, content: bytes, doc_type_hint: str = "auto"
+    ) -> ParsedDocument:
+        """Parse raw bytes (PDF or text). Handles PDF extraction automatically."""
+        try:
+            text = content.decode("utf-8")
+            return await self.parse_text(clean_text(text), doc_type_hint)
+        except UnicodeDecodeError:
+            import tempfile
+            import os
+
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                tmp.write(content)
+                tmp_path = tmp.name
+            try:
+                return await self.parse_file(tmp_path, doc_type_hint)
+            finally:
+                os.unlink(tmp_path)
+
+    async def parse_file(
+        self, path: str | Path, doc_type_hint: str = "auto"
+    ) -> ParsedDocument:
         """Parse a document file (PDF or txt)."""
         path = Path(path)
         if path.suffix.lower() == ".pdf":
@@ -183,11 +216,15 @@ class DocumentParser:
             raw_text = path.read_text(encoding="utf-8", errors="replace")
         return await self.parse_text(clean_text(raw_text), doc_type_hint)
 
-    async def parse_text(self, text: str, doc_type_hint: str = "auto") -> ParsedDocument:
+    async def parse_text(
+        self, text: str, doc_type_hint: str = "auto"
+    ) -> ParsedDocument:
         """Parse raw document text. Detects document type if hint is 'auto'."""
         # Truncate to ~80k chars to stay within context limits
         text = text[:80_000]
-        doc_type = doc_type_hint if doc_type_hint != "auto" else self._detect_doc_type(text)
+        doc_type = (
+            doc_type_hint if doc_type_hint != "auto" else self._detect_doc_type(text)
+        )
 
         if doc_type == "t12":
             return await self._parse_t12(text)
@@ -200,9 +237,28 @@ class DocumentParser:
 
     def _detect_doc_type(self, text: str) -> str:
         text_lower = text.lower()
-        t12_signals = ["trailing 12", "t-12", "t12", "income statement", "profit and loss", "p&l"]
-        rr_signals = ["rent roll", "unit mix", "unit #", "unit id", "lease expir", "market rent"]
-        om_signals = ["offering memorandum", "investment summary", "executive summary", "cap rate"]
+        t12_signals = [
+            "trailing 12",
+            "t-12",
+            "t12",
+            "income statement",
+            "profit and loss",
+            "p&l",
+        ]
+        rr_signals = [
+            "rent roll",
+            "unit mix",
+            "unit #",
+            "unit id",
+            "lease expir",
+            "market rent",
+        ]
+        om_signals = [
+            "offering memorandum",
+            "investment summary",
+            "executive summary",
+            "cap rate",
+        ]
 
         t12_score = sum(1 for s in t12_signals if s in text_lower)
         rr_score = sum(1 for s in rr_signals if s in text_lower)
@@ -279,8 +335,14 @@ Return ONLY valid JSON. No markdown, no commentary outside the JSON."""
             data = json.loads(raw)
         except json.JSONDecodeError:
             logger.warning("DocumentParser: failed to parse OM JSON response")
-            return ParsedDocument(doc_type="om", deal_input=None, t12=None, rent_roll=None,
-                                  confidence="LOW", red_flags=["AI response could not be parsed"])
+            return ParsedDocument(
+                doc_type="om",
+                deal_input=None,
+                t12=None,
+                rent_roll=None,
+                confidence="LOW",
+                red_flags=["AI response could not be parsed"],
+            )
         return self._build_om_result(data, len(text))
 
     def _build_om_result(self, data: dict, text_chars: int) -> ParsedDocument:
@@ -296,7 +358,8 @@ Return ONLY valid JSON. No markdown, no commentary outside the JSON."""
         if purchase_price and gsi:
             try:
                 deal_input = DealInput(
-                    name=prop.get("name") or f"{prop.get('city_state', 'Unknown')} Property",
+                    name=prop.get("name")
+                    or f"{prop.get('city_state', 'Unknown')} Property",
                     asset_class=prop.get("asset_class", "multifamily"),
                     purchase_price=purchase_price,
                     units=prop.get("units"),
@@ -316,7 +379,8 @@ Return ONLY valid JSON. No markdown, no commentary outside the JSON."""
                         vacancy_rate=income.get("vacancy_rate") or 0.05,
                         credit_loss_rate=0.005,
                         other_income=income.get("other_income_annual") or 0,
-                        property_taxes=expenses.get("property_taxes") or purchase_price * 0.015,
+                        property_taxes=expenses.get("property_taxes")
+                        or purchase_price * 0.015,
                         insurance=expenses.get("insurance") or purchase_price * 0.004,
                         management_fee_pct=expenses.get("management_fee_pct") or 0.05,
                         maintenance_reserves=expenses.get("maintenance_repairs") or 0,
@@ -392,8 +456,14 @@ Return ONLY valid JSON."""
             data = json.loads(raw)
         except json.JSONDecodeError:
             logger.warning("DocumentParser: failed to parse T-12 JSON response")
-            return ParsedDocument(doc_type="t12", deal_input=None, t12=None, rent_roll=None,
-                                  confidence="LOW", red_flags=["AI response could not be parsed"])
+            return ParsedDocument(
+                doc_type="t12",
+                deal_input=None,
+                t12=None,
+                rent_roll=None,
+                confidence="LOW",
+                red_flags=["AI response could not be parsed"],
+            )
         inc = data.get("income", {})
         exp = data.get("expenses", {})
 
@@ -471,15 +541,23 @@ DOCUMENT TEXT:
 {text}
 
 Return ONLY valid JSON. If the rent roll has many units, summarize the units array to a representative sample plus accurate aggregate summary."""
-        response = await self._call_api("claude-sonnet-4-6", 4096, RENT_ROLL_SYSTEM, content)
+        response = await self._call_api(
+            "claude-sonnet-4-6", 4096, RENT_ROLL_SYSTEM, content
+        )
 
         raw = self._strip_fences(response.content[0].text)
         try:
             data = json.loads(raw)
         except json.JSONDecodeError:
             logger.warning("DocumentParser: failed to parse rent roll JSON response")
-            return ParsedDocument(doc_type="rent_roll", deal_input=None, t12=None, rent_roll=None,
-                                  confidence="LOW", red_flags=["AI response could not be parsed"])
+            return ParsedDocument(
+                doc_type="rent_roll",
+                deal_input=None,
+                t12=None,
+                rent_roll=None,
+                confidence="LOW",
+                red_flags=["AI response could not be parsed"],
+            )
         summary_data = data.get("summary", {})
 
         total = data.get("total_units") or 0
@@ -524,7 +602,9 @@ Return ONLY valid JSON. If the rent roll has many units, summarize the units arr
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
-        retry=retry_if_exception_type((APITimeoutError, RateLimitError, InternalServerError)),
+        retry=retry_if_exception_type(
+            (APITimeoutError, RateLimitError, InternalServerError)
+        ),
         reraise=True,
     )
     async def _call_api(self, model: str, max_tokens: int, system: str, content: str):

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { FileText, RefreshCw, AlertTriangle, ArrowLeft } from "lucide-react";
+import { FileText, RefreshCw, ArrowLeft } from "lucide-react";
 import { getSampleResult } from "@/lib/api";
 import type { UnderwritingResult } from "@/types";
 import MetricsBar from "@/components/Dashboard/MetricsBar";

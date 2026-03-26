@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { Sparkles, ArrowRight, Loader2, AlertCircle } from "lucide-react";
 import { analyzeDeal, underwrite } from "@/lib/api";
-import type { DealInput, UnderwritingResult } from "@/types";
+import type { DealInput } from "@/types";
 import DealForm from "@/components/Underwriting/DealForm";
 import { cn } from "@/lib/utils";
 
@@ -11,8 +11,6 @@ export default function UnderwritePage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<"ai" | "manual">("ai");
   const [nlText, setNlText] = useState("");
-  const [result, setResult] = useState<UnderwritingResult | null>(null);
-
   const aiMutation = useMutation({
     mutationFn: analyzeDeal,
     onSuccess: (data) => {

@@ -41,11 +41,11 @@ class FairMarketRents:
     year: Optional[str] = None
 
     # FMRs by bedroom count (monthly, inclusive of utilities)
-    fmr_studio: Optional[int] = None    # Efficiency / Studio
-    fmr_1br: Optional[int] = None       # 1 Bedroom
-    fmr_2br: Optional[int] = None       # 2 Bedroom
-    fmr_3br: Optional[int] = None       # 3 Bedroom
-    fmr_4br: Optional[int] = None       # 4 Bedroom
+    fmr_studio: Optional[int] = None  # Efficiency / Studio
+    fmr_1br: Optional[int] = None  # 1 Bedroom
+    fmr_2br: Optional[int] = None  # 2 Bedroom
+    fmr_3br: Optional[int] = None  # 3 Bedroom
+    fmr_4br: Optional[int] = None  # 4 Bedroom
 
     # Median rent (weighted average, used for general benchmarking)
     median_fmr: Optional[float] = None
@@ -86,7 +86,9 @@ class FairMarketRents:
         elif pct > 0:
             return f"Market rent of ${market_rent:,.0f}/mo is {pct:.0f}% above HUD FMR (${fmr:,}/mo)."
         elif pct > -10:
-            return f"Market rent of ${market_rent:,.0f}/mo is near HUD FMR (${fmr:,}/mo)."
+            return (
+                f"Market rent of ${market_rent:,.0f}/mo is near HUD FMR (${fmr:,}/mo)."
+            )
         else:
             return f"Market rent of ${market_rent:,.0f}/mo is {abs(pct):.0f}% below HUD FMR (${fmr:,}/mo) — may indicate soft market."
 
@@ -103,9 +105,9 @@ class IncomeLimits:
     # Income limits as % of Area Median Income (AMI)
     # Very Low Income (50% AMI), Low Income (80% AMI)
     # Keys: household size 1–8 persons
-    vli_50pct: dict = field(default_factory=dict)   # Very Low Income
-    li_80pct: dict = field(default_factory=dict)    # Low Income
-    eli_30pct: dict = field(default_factory=dict)   # Extremely Low Income
+    vli_50pct: dict = field(default_factory=dict)  # Very Low Income
+    li_80pct: dict = field(default_factory=dict)  # Low Income
+    eli_30pct: dict = field(default_factory=dict)  # Extremely Low Income
 
     source: str = "HUD Income Limits"
     warnings: list[str] = field(default_factory=list)
@@ -191,13 +193,25 @@ class HUDClient:
                 if isinstance(basic, list) and basic:
                     basic = basic[0]
 
-                fmr.area_name = basic.get("areaname") or basic.get("countyname", fips_code)
+                fmr.area_name = basic.get("areaname") or basic.get(
+                    "countyname", fips_code
+                )
                 fmr.year = str(basic.get("year", ""))
-                fmr.fmr_studio = self._safe_int(basic.get("Efficiency") or basic.get("efficiency"))
-                fmr.fmr_1br = self._safe_int(basic.get("One-Bedroom") or basic.get("oneBR"))
-                fmr.fmr_2br = self._safe_int(basic.get("Two-Bedroom") or basic.get("twoBR"))
-                fmr.fmr_3br = self._safe_int(basic.get("Three-Bedroom") or basic.get("threeBR"))
-                fmr.fmr_4br = self._safe_int(basic.get("Four-Bedroom") or basic.get("fourBR"))
+                fmr.fmr_studio = self._safe_int(
+                    basic.get("Efficiency") or basic.get("efficiency")
+                )
+                fmr.fmr_1br = self._safe_int(
+                    basic.get("One-Bedroom") or basic.get("oneBR")
+                )
+                fmr.fmr_2br = self._safe_int(
+                    basic.get("Two-Bedroom") or basic.get("twoBR")
+                )
+                fmr.fmr_3br = self._safe_int(
+                    basic.get("Three-Bedroom") or basic.get("threeBR")
+                )
+                fmr.fmr_4br = self._safe_int(
+                    basic.get("Four-Bedroom") or basic.get("fourBR")
+                )
 
             elif isinstance(result, list) and result:
                 row = result[0]
@@ -211,7 +225,14 @@ class HUDClient:
 
             # Compute weighted median (rough approximation weighting 1br and 2br)
             prices = [
-                v for v in [fmr.fmr_studio, fmr.fmr_1br, fmr.fmr_2br, fmr.fmr_3br, fmr.fmr_4br]
+                v
+                for v in [
+                    fmr.fmr_studio,
+                    fmr.fmr_1br,
+                    fmr.fmr_2br,
+                    fmr.fmr_3br,
+                    fmr.fmr_4br,
+                ]
                 if v is not None
             ]
             if prices:
@@ -250,7 +271,9 @@ class HUDClient:
             if not data or "data" not in data:
                 return results
 
-            areas = data["data"].get("metroareas", []) + data["data"].get("counties", [])
+            areas = data["data"].get("metroareas", []) + data["data"].get(
+                "counties", []
+            )
             for area in areas:
                 fmr = FairMarketRents(
                     geography=area.get("areaname", "Unknown"),

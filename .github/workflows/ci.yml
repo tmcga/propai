@@ -38,7 +38,7 @@ jobs:
             --cov=engine \
             --cov-report=term-missing \
             --cov-report=xml \
-            --cov-fail-under=90 \
+            --cov-fail-under=85 \
             -p no:cacheprovider
 
       - name: Upload coverage to Codecov

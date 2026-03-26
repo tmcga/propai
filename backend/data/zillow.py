@@ -21,7 +21,7 @@ import os
 import csv
 import io
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass, field
@@ -38,16 +38,15 @@ CACHE_TTL_DAYS = 30  # Zillow updates monthly
 # Smoothed, seasonally adjusted, all homes (most useful for analysis)
 ZILLOW_URLS = {
     # ZHVI — Home Values
-    "zhvi_zip":    "https://files.zillowstatic.com/research/public_csvs/zhvi/Zip_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv",
-    "zhvi_metro":  "https://files.zillowstatic.com/research/public_csvs/zhvi/Metro_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv",
+    "zhvi_zip": "https://files.zillowstatic.com/research/public_csvs/zhvi/Zip_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv",
+    "zhvi_metro": "https://files.zillowstatic.com/research/public_csvs/zhvi/Metro_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv",
     "zhvi_county": "https://files.zillowstatic.com/research/public_csvs/zhvi/County_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv",
-    "zhvi_state":  "https://files.zillowstatic.com/research/public_csvs/zhvi/State_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv",
-
+    "zhvi_state": "https://files.zillowstatic.com/research/public_csvs/zhvi/State_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv",
     # ZORI — Observed Rents (multifamily focus)
-    "zori_zip":    "https://files.zillowstatic.com/research/public_csvs/zori/Zip_zori_sm_month.csv",
-    "zori_metro":  "https://files.zillowstatic.com/research/public_csvs/zori/Metro_zori_sm_month.csv",
+    "zori_zip": "https://files.zillowstatic.com/research/public_csvs/zori/Zip_zori_sm_month.csv",
+    "zori_metro": "https://files.zillowstatic.com/research/public_csvs/zori/Metro_zori_sm_month.csv",
     "zori_county": "https://files.zillowstatic.com/research/public_csvs/zori/County_zori_sm_month.csv",
-    "zori_state":  "https://files.zillowstatic.com/research/public_csvs/zori/State_zori_sm_month.csv",
+    "zori_state": "https://files.zillowstatic.com/research/public_csvs/zori/State_zori_sm_month.csv",
 }
 
 
@@ -56,29 +55,31 @@ class ZillowMetrics:
     """Zillow market metrics for a geography."""
 
     geography: str
-    geography_type: str   # "zip", "metro", "county", "state"
+    geography_type: str  # "zip", "metro", "county", "state"
     region_id: Optional[str] = None
 
     # ZHVI (Home Values)
-    current_zhvi: Optional[float] = None            # Most recent month
+    current_zhvi: Optional[float] = None  # Most recent month
     zhvi_1yr_ago: Optional[float] = None
     zhvi_3yr_ago: Optional[float] = None
     zhvi_5yr_ago: Optional[float] = None
-    zhvi_yoy_pct: Optional[float] = None            # Year-over-year %
-    zhvi_3yr_cagr: Optional[float] = None           # 3-year CAGR
-    zhvi_5yr_cagr: Optional[float] = None           # 5-year CAGR
-    zhvi_history: list[dict] = field(default_factory=list)  # {"date": "2023-01", "value": 450000}
+    zhvi_yoy_pct: Optional[float] = None  # Year-over-year %
+    zhvi_3yr_cagr: Optional[float] = None  # 3-year CAGR
+    zhvi_5yr_cagr: Optional[float] = None  # 5-year CAGR
+    zhvi_history: list[dict] = field(
+        default_factory=list
+    )  # {"date": "2023-01", "value": 450000}
 
     # ZORI (Rents)
-    current_zori: Optional[float] = None            # Current median market rent
+    current_zori: Optional[float] = None  # Current median market rent
     zori_1yr_ago: Optional[float] = None
     zori_yoy_pct: Optional[float] = None
     zori_3yr_cagr: Optional[float] = None
     zori_history: list[dict] = field(default_factory=list)
 
     # Derived RE signals
-    price_to_rent_ratio: Optional[float] = None    # ZHVI / (ZORI * 12)
-    rent_growth_trend: Optional[str] = None        # "accelerating", "stable", "decelerating"
+    price_to_rent_ratio: Optional[float] = None  # ZHVI / (ZORI * 12)
+    rent_growth_trend: Optional[str] = None  # "accelerating", "stable", "decelerating"
 
     data_as_of: Optional[str] = None
     source: str = "Zillow Research"
@@ -147,8 +148,12 @@ class ZillowClient:
             zipcode: 5-digit US ZIP code (e.g., "78701")
         """
         metrics = ZillowMetrics(geography=f"ZIP {zipcode}", geography_type="zip")
-        await self._enrich_with_zhvi(metrics, "zhvi_zip", zipcode, match_field="RegionName")
-        await self._enrich_with_zori(metrics, "zori_zip", zipcode, match_field="RegionName")
+        await self._enrich_with_zhvi(
+            metrics, "zhvi_zip", zipcode, match_field="RegionName"
+        )
+        await self._enrich_with_zori(
+            metrics, "zori_zip", zipcode, match_field="RegionName"
+        )
         self._compute_derived(metrics)
         return metrics
 
@@ -161,7 +166,9 @@ class ZillowClient:
             state:       State abbreviation (e.g., "TX")
         """
         search_term = county_name
-        metrics = ZillowMetrics(geography=f"{county_name} County, {state}", geography_type="county")
+        metrics = ZillowMetrics(
+            geography=f"{county_name} County, {state}", geography_type="county"
+        )
         await self._enrich_with_zhvi(metrics, "zhvi_county", search_term)
         await self._enrich_with_zori(metrics, "zori_county", search_term)
         self._compute_derived(metrics)
@@ -193,7 +200,9 @@ class ZillowClient:
 
         # Check cache freshness
         if cache_file.exists():
-            age_days = (datetime.now() - datetime.fromtimestamp(cache_file.stat().st_mtime)).days
+            age_days = (
+                datetime.now() - datetime.fromtimestamp(cache_file.stat().st_mtime)
+            ).days
             if age_days < CACHE_TTL_DAYS:
                 logger.debug(f"Serving {dataset_key} from cache ({age_days}d old)")
                 return self._parse_csv(cache_file.read_text(encoding="utf-8"))
@@ -206,8 +215,9 @@ class ZillowClient:
 
         try:
             client = self._client or httpx.AsyncClient(
-                timeout=120.0, follow_redirects=True,
-                headers={"User-Agent": "PropAI/0.1"}
+                timeout=120.0,
+                follow_redirects=True,
+                headers={"User-Agent": "PropAI/0.1"},
             )
             resp = await client.get(url)
             resp.raise_for_status()
@@ -219,7 +229,9 @@ class ZillowClient:
             return self._parse_csv(text)
 
         except httpx.HTTPStatusError as e:
-            logger.warning(f"Zillow CSV download failed ({dataset_key}): HTTP {e.response.status_code}")
+            logger.warning(
+                f"Zillow CSV download failed ({dataset_key}): HTTP {e.response.status_code}"
+            )
             # Try serving stale cache if available
             if cache_file.exists():
                 logger.info(f"Serving stale cache for {dataset_key}")
@@ -297,12 +309,16 @@ class ZillowClient:
         """Populate ZHVI fields on a ZillowMetrics object."""
         rows = await self._get_csv(dataset_key)
         if not rows:
-            metrics.warnings.append(f"ZHVI data unavailable (could not download {dataset_key})")
+            metrics.warnings.append(
+                f"ZHVI data unavailable (could not download {dataset_key})"
+            )
             return
 
         row = self._find_row(rows, search_term, match_field)
         if not row:
-            metrics.warnings.append(f"No ZHVI match for '{search_term}' in {dataset_key}")
+            metrics.warnings.append(
+                f"No ZHVI match for '{search_term}' in {dataset_key}"
+            )
             return
 
         history = self._extract_history(row)
@@ -321,17 +337,20 @@ class ZillowClient:
         # YoY %
         if metrics.current_zhvi and metrics.zhvi_1yr_ago:
             metrics.zhvi_yoy_pct = round(
-                (metrics.current_zhvi - metrics.zhvi_1yr_ago) / metrics.zhvi_1yr_ago * 100, 2
+                (metrics.current_zhvi - metrics.zhvi_1yr_ago)
+                / metrics.zhvi_1yr_ago
+                * 100,
+                2,
             )
 
         # CAGRs
         if metrics.current_zhvi and metrics.zhvi_3yr_ago:
             metrics.zhvi_3yr_cagr = round(
-                ((metrics.current_zhvi / metrics.zhvi_3yr_ago) ** (1/3) - 1) * 100, 2
+                ((metrics.current_zhvi / metrics.zhvi_3yr_ago) ** (1 / 3) - 1) * 100, 2
             )
         if metrics.current_zhvi and metrics.zhvi_5yr_ago:
             metrics.zhvi_5yr_cagr = round(
-                ((metrics.current_zhvi / metrics.zhvi_5yr_ago) ** (1/5) - 1) * 100, 2
+                ((metrics.current_zhvi / metrics.zhvi_5yr_ago) ** (1 / 5) - 1) * 100, 2
             )
 
     async def _enrich_with_zori(
@@ -344,12 +363,16 @@ class ZillowClient:
         """Populate ZORI (rent) fields on a ZillowMetrics object."""
         rows = await self._get_csv(dataset_key)
         if not rows:
-            metrics.warnings.append(f"ZORI data unavailable (could not download {dataset_key})")
+            metrics.warnings.append(
+                f"ZORI data unavailable (could not download {dataset_key})"
+            )
             return
 
         row = self._find_row(rows, search_term, match_field)
         if not row:
-            metrics.warnings.append(f"No ZORI match for '{search_term}' in {dataset_key}")
+            metrics.warnings.append(
+                f"No ZORI match for '{search_term}' in {dataset_key}"
+            )
             return
 
         history = self._extract_history(row)
@@ -362,14 +385,17 @@ class ZillowClient:
 
         if metrics.current_zori and metrics.zori_1yr_ago:
             metrics.zori_yoy_pct = round(
-                (metrics.current_zori - metrics.zori_1yr_ago) / metrics.zori_1yr_ago * 100, 2
+                (metrics.current_zori - metrics.zori_1yr_ago)
+                / metrics.zori_1yr_ago
+                * 100,
+                2,
             )
 
         if metrics.current_zori:
             zori_3yr = self._value_n_months_ago(history, 36)
             if zori_3yr:
                 metrics.zori_3yr_cagr = round(
-                    ((metrics.current_zori / zori_3yr) ** (1/3) - 1) * 100, 2
+                    ((metrics.current_zori / zori_3yr) ** (1 / 3) - 1) * 100, 2
                 )
 
     @staticmethod

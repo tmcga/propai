@@ -8,13 +8,14 @@ there is no dependency on numpy-financial (keeping the engine portable).
 
 from __future__ import annotations
 
-import math
+from collections.abc import Callable
 from typing import Optional
 
 
 # ---------------------------------------------------------------------------
 # Core DCF Functions
 # ---------------------------------------------------------------------------
+
 
 def npv(discount_rate: float, cash_flows: list[float]) -> float:
     """
@@ -71,9 +72,7 @@ def irr(
 
         # f'(r) = dNPV/dr  = Σ -t × CF_t / (1 + r)^(t+1)
         f_prime = sum(
-            -t * cf / (1 + rate) ** (t + 1)
-            for t, cf in enumerate(cash_flows)
-            if t > 0
+            -t * cf / (1 + rate) ** (t + 1) for t, cf in enumerate(cash_flows) if t > 0
         )
 
         if abs(f_prime) < 1e-12:
@@ -112,9 +111,7 @@ def _irr_attempt(
     for _ in range(max_iterations):
         f = sum(cf / (1 + rate) ** t for t, cf in enumerate(cash_flows))
         f_prime = sum(
-            -t * cf / (1 + rate) ** (t + 1)
-            for t, cf in enumerate(cash_flows)
-            if t > 0
+            -t * cf / (1 + rate) ** (t + 1) for t, cf in enumerate(cash_flows) if t > 0
         )
         if abs(f_prime) < 1e-12:
             return None
@@ -175,8 +172,9 @@ def average_cash_on_cash(
 # Sensitivity Analysis
 # ---------------------------------------------------------------------------
 
+
 def irr_sensitivity_table(
-    base_cash_flow_fn,  # callable(rent_growth, exit_cap) -> list[float]
+    base_cash_flow_fn: Callable[[float, float], list[float]],
     rent_growth_range: list[float],
     exit_cap_range: list[float],
 ) -> list[list[float]]:
@@ -209,7 +207,7 @@ def irr_sensitivity_table(
 
 
 def coc_sensitivity_table(
-    base_cash_flow_fn,  # callable(rent_growth, exit_cap) -> (btcf_yr1, equity)
+    base_cash_flow_fn: Callable[[float, float], tuple[float, float]],
     rent_growth_range: list[float],
     interest_rate_range: list[float],
 ) -> list[list[float]]:
@@ -235,6 +233,7 @@ def coc_sensitivity_table(
 # ---------------------------------------------------------------------------
 # Unlevered (Asset-Level) vs Levered (Equity-Level) Returns
 # ---------------------------------------------------------------------------
+
 
 class DCFEngine:
     """
@@ -305,7 +304,7 @@ class DCFEngine:
         operating_cfs = self.equity_cash_flows[1:-1]  # Exclude t=0 and final year
         return average_cash_on_cash(operating_cfs, equity_invested)
 
-    def summary(self) -> dict:
+    def summary(self) -> dict[str, object]:
         """Return all key DCF metrics as a dictionary."""
         l_irr = self.levered_irr
         ul_irr = self.unlevered_irr

@@ -12,7 +12,6 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Security, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyHeader
 
 logger = logging.getLogger(__name__)
@@ -41,7 +40,11 @@ async def verify_api_key(
     """Validate the API key if authentication is enabled."""
     if not AUTH_ENABLED:
         return None
-    if not api_key or not secrets.compare_digest(api_key, api_key) or api_key not in VALID_API_KEYS:
+    if (
+        not api_key
+        or not secrets.compare_digest(api_key, api_key)
+        or api_key not in VALID_API_KEYS
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing API key. Set X-API-Key header.",
@@ -53,11 +56,11 @@ async def verify_api_key(
 # Rate Limiting (simple in-memory, per-IP)
 # ---------------------------------------------------------------------------
 
-from collections import defaultdict
-from time import monotonic
+from collections import defaultdict  # noqa: E402
+from time import monotonic  # noqa: E402
 
 RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "30"))  # per window
-RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", "60"))      # seconds
+RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", "60"))  # seconds
 
 _rate_store: dict[str, list[float]] = defaultdict(list)
 
@@ -84,15 +87,42 @@ async def rate_limit(request: Request) -> None:
 # App Lifecycle
 # ---------------------------------------------------------------------------
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown logic."""
     if AUTH_ENABLED:
-        logger.info("API key authentication ENABLED (%d keys configured)", len(VALID_API_KEYS))
+        logger.info(
+            "API key authentication ENABLED (%d keys configured)", len(VALID_API_KEYS)
+        )
     else:
         logger.info("API key authentication DISABLED (set PROPAI_API_KEYS to enable)")
     logger.info("PropAI starting up (env=%s)...", ENV)
+
+    # Initialize database (create tables in dev, skip if DB not available)
+    try:
+        from db.session import init_db
+
+        init_db()
+        from db.session import engine as db_engine
+        from db.base import Base
+
+        async with db_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database tables initialized")
+    except Exception as e:
+        logger.warning("Database not available (deals API will be unavailable): %s", e)
+
     yield
+
+    # Dispose database engine
+    try:
+        from db.session import engine as db_engine
+
+        if db_engine:
+            await db_engine.dispose()
+    except Exception:
+        pass
     logger.info("PropAI shutting down.")
 
 
@@ -139,8 +169,7 @@ GET  /api/underwrite/sample/result  →  Sample computed result
 # ---------------------------------------------------------------------------
 
 ALLOWED_ORIGINS = os.getenv(
-    "ALLOWED_ORIGINS",
-    "http://localhost:3000,http://localhost:5173"
+    "ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173"
 ).split(",")
 
 app.add_middleware(
@@ -155,19 +184,22 @@ app.add_middleware(
 # Routers
 # ---------------------------------------------------------------------------
 
-from api.underwriting import router as underwriting_router
-from api.market import router as market_router
-from api.ai import router as ai_router
-from api.analysis import router as analysis_router
+from api.underwriting import router as underwriting_router  # noqa: E402
+from api.market import router as market_router  # noqa: E402
+from api.ai import router as ai_router  # noqa: E402
+from api.analysis import router as analysis_router  # noqa: E402
+from api.deals import router as deals_router  # noqa: E402
 
 app.include_router(underwriting_router)
 app.include_router(market_router)
 app.include_router(ai_router)
 app.include_router(analysis_router)
+app.include_router(deals_router)
 
 # ---------------------------------------------------------------------------
 # Root
 # ---------------------------------------------------------------------------
+
 
 @app.get("/", tags=["root"])
 async def root():
@@ -190,6 +222,7 @@ async def health():
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         "main:app",
         host="0.0.0.0",

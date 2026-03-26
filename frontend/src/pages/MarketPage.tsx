@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Search, Loader2, TrendingUp, TrendingDown, AlertCircle } from "lucide-react";
 import { getMetroMarket, getZipMarket } from "@/lib/api";
-import type { MarketReport } from "@/types";
 import { fmt, gradeColor } from "@/lib/utils";
 import MacroSnapshot from "@/components/Dashboard/MacroSnapshot";
 
