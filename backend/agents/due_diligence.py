@@ -19,10 +19,14 @@ Red flag categories:
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from anthropic import AsyncAnthropic
+from anthropic import AsyncAnthropic, APITimeoutError, RateLimitError, InternalServerError
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+logger = logging.getLogger(__name__)
 
 from agents.document_parser import T12Summary, RentRollSummary
 from engine.financial.models import DealInput
@@ -254,54 +258,28 @@ class DueDiligenceAgent:
 
         context = self._build_context(deal, t12, rent_roll, math_flags, additional_docs)
 
-        response = await self.client.messages.create(
-            model="claude-opus-4-6",
-            max_tokens=4096,
-            system="""You are a veteran real estate due diligence analyst with 20 years of experience
-catching seller manipulation, hidden liabilities, and underwriting errors before closing.
-
-You are direct and specific. When you identify a red flag, you explain exactly what number
-doesn't add up and what it likely means. You distinguish between deal-killers and items
-that can be negotiated or priced into the deal.
-
-Your job is to protect the investor's capital.""",
-            messages=[{
-                "role": "user",
-                "content": f"""Analyze this real estate deal for red flags and risks. Return structured JSON.
-
-{context}
-
-Return ONLY valid JSON matching this schema:
-{{
-  "overall_risk": "HIGH|MEDIUM|LOW",
-  "proceed_recommendation": "PROCEED|PROCEED_WITH_CONDITIONS|PAUSE|PASS",
-  "headline_summary": "2-3 sentence executive summary of findings",
-  "seller_noi": null,
-  "adjusted_noi": null,
-  "noi_haircut_pct": null,
-  "red_flags": [
-    {{
-      "severity": "CRITICAL|HIGH|MEDIUM|LOW",
-      "category": "Income|Expenses|Rent Roll|Market|Financing|Physical",
-      "title": "Short flag title",
-      "detail": "Specific explanation with numbers",
-      "suggested_action": "What to do about this",
-      "financial_impact": "Estimated annual NOI or value impact"
-    }}
-  ],
-  "diligence_questions": ["Question to ask seller 1", "..."],
-  "document_requests": ["Document to request 1", "..."],
-  "full_analysis": "3-5 paragraph detailed analysis"
-}}"""
-            }],
-        )
+        response = await self._call_api(context)
 
         raw = response.content[0].text.strip()
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"):
                 raw = raw[4:]
-        data = json.loads(raw.strip())
+        try:
+            data = json.loads(raw.strip())
+        except json.JSONDecodeError:
+            logger.warning("DueDiligence: failed to parse LLM JSON response")
+            return DDReport(
+                overall_risk="MEDIUM",
+                proceed_recommendation="PAUSE",
+                headline_summary="AI analysis could not be parsed. Review deal data manually.",
+                red_flags=[],
+                critical_count=0,
+                high_count=0,
+                medium_count=0,
+                low_count=0,
+                full_analysis="The AI response could not be parsed into structured data.",
+            )
 
         flags = [
             RedFlag(
@@ -407,3 +385,54 @@ Return ONLY valid JSON matching this schema:
             lines.append(f"\nADDITIONAL DOCUMENTS / NOTES:\n{additional_docs}")
 
         return "\n".join(lines)
+
+    DD_SYSTEM_PROMPT = (
+        "You are a veteran real estate due diligence analyst with 20 years of experience "
+        "catching seller manipulation, hidden liabilities, and underwriting errors before closing.\n\n"
+        "You are direct and specific. When you identify a red flag, you explain exactly what number "
+        "doesn't add up and what it likely means. You distinguish between deal-killers and items "
+        "that can be negotiated or priced into the deal.\n\n"
+        "Your job is to protect the investor's capital."
+    )
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type((APITimeoutError, RateLimitError, InternalServerError)),
+        reraise=True,
+    )
+    async def _call_api(self, context: str):
+        return await self.client.messages.create(
+            model="claude-opus-4-6",
+            max_tokens=4096,
+            system=self.DD_SYSTEM_PROMPT,
+            messages=[{
+                "role": "user",
+                "content": f"""Analyze this real estate deal for red flags and risks. Return structured JSON.
+
+{context}
+
+Return ONLY valid JSON matching this schema:
+{{
+  "overall_risk": "HIGH|MEDIUM|LOW",
+  "proceed_recommendation": "PROCEED|PROCEED_WITH_CONDITIONS|PAUSE|PASS",
+  "headline_summary": "2-3 sentence executive summary of findings",
+  "seller_noi": null,
+  "adjusted_noi": null,
+  "noi_haircut_pct": null,
+  "red_flags": [
+    {{
+      "severity": "CRITICAL|HIGH|MEDIUM|LOW",
+      "category": "Income|Expenses|Rent Roll|Market|Financing|Physical",
+      "title": "Short flag title",
+      "detail": "Specific explanation with numbers",
+      "suggested_action": "What to do about this",
+      "financial_impact": "Estimated annual NOI or value impact"
+    }}
+  ],
+  "diligence_questions": ["Question to ask seller 1", "..."],
+  "document_requests": ["Document to request 1", "..."],
+  "full_analysis": "3-5 paragraph detailed analysis"
+}}"""
+            }],
+        )

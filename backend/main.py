@@ -5,17 +5,79 @@ FastAPI Application Entry Point
 
 from __future__ import annotations
 
+import logging
 import os
+import secrets
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException, Request, Security, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.security import APIKeyHeader
 
-from api.underwriting import router as underwriting_router
-from api.market import router as market_router
-from api.ai import router as ai_router
-from api.analysis import router as analysis_router
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Environment
+# ---------------------------------------------------------------------------
+
+ENV = os.getenv("ENV", "development")
+IS_PRODUCTION = ENV == "production"
+
+# ---------------------------------------------------------------------------
+# API Key Authentication (optional — enabled when PROPAI_API_KEYS is set)
+# ---------------------------------------------------------------------------
+
+_raw_keys = os.getenv("PROPAI_API_KEYS", "")
+VALID_API_KEYS: set[str] = {k.strip() for k in _raw_keys.split(",") if k.strip()}
+AUTH_ENABLED = bool(VALID_API_KEYS)
+
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+
+async def verify_api_key(
+    api_key: str | None = Security(api_key_header),
+) -> str | None:
+    """Validate the API key if authentication is enabled."""
+    if not AUTH_ENABLED:
+        return None
+    if not api_key or not secrets.compare_digest(api_key, api_key) or api_key not in VALID_API_KEYS:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or missing API key. Set X-API-Key header.",
+        )
+    return api_key
+
+
+# ---------------------------------------------------------------------------
+# Rate Limiting (simple in-memory, per-IP)
+# ---------------------------------------------------------------------------
+
+from collections import defaultdict
+from time import monotonic
+
+RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "30"))  # per window
+RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", "60"))      # seconds
+
+_rate_store: dict[str, list[float]] = defaultdict(list)
+
+
+async def rate_limit(request: Request) -> None:
+    """Simple sliding-window rate limiter for AI-intensive endpoints."""
+    client_ip = request.client.host if request.client else "unknown"
+    now = monotonic()
+    window_start = now - RATE_LIMIT_WINDOW
+
+    # Prune old entries
+    timestamps = _rate_store[client_ip]
+    _rate_store[client_ip] = [t for t in timestamps if t > window_start]
+
+    if len(_rate_store[client_ip]) >= RATE_LIMIT_REQUESTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Rate limit exceeded. Max {RATE_LIMIT_REQUESTS} requests per {RATE_LIMIT_WINDOW}s.",
+        )
+    _rate_store[client_ip].append(now)
 
 
 # ---------------------------------------------------------------------------
@@ -25,9 +87,13 @@ from api.analysis import router as analysis_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown logic."""
-    print("🏢 PropAI starting up...")
+    if AUTH_ENABLED:
+        logger.info("API key authentication ENABLED (%d keys configured)", len(VALID_API_KEYS))
+    else:
+        logger.info("API key authentication DISABLED (set PROPAI_API_KEYS to enable)")
+    logger.info("PropAI starting up (env=%s)...", ENV)
     yield
-    print("🏢 PropAI shutting down.")
+    logger.info("PropAI shutting down.")
 
 
 # ---------------------------------------------------------------------------
@@ -63,8 +129,9 @@ GET  /api/underwrite/sample/result  →  Sample computed result
     """,
     version="0.1.0",
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url="/docs" if not IS_PRODUCTION else None,
+    redoc_url="/redoc" if not IS_PRODUCTION else None,
+    dependencies=[Depends(verify_api_key)],
 )
 
 # ---------------------------------------------------------------------------
@@ -80,13 +147,18 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-API-Key"],
 )
 
 # ---------------------------------------------------------------------------
 # Routers
 # ---------------------------------------------------------------------------
+
+from api.underwriting import router as underwriting_router
+from api.market import router as market_router
+from api.ai import router as ai_router
+from api.analysis import router as analysis_router
 
 app.include_router(underwriting_router)
 app.include_router(market_router)
@@ -102,7 +174,7 @@ async def root():
     return {
         "name": "PropAI",
         "version": "0.1.0",
-        "docs": "/docs",
+        "docs": "/docs" if not IS_PRODUCTION else None,
         "status": "operational",
     }
 
@@ -122,6 +194,6 @@ if __name__ == "__main__":
         "main:app",
         host="0.0.0.0",
         port=int(os.getenv("PORT", "8000")),
-        reload=os.getenv("ENV", "development") == "development",
+        reload=not IS_PRODUCTION,
         log_level="info",
     )

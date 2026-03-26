@@ -12,10 +12,14 @@ Designed for top-of-funnel deal flow where an investor might see
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, field
 from typing import Literal
 
-from anthropic import AsyncAnthropic
+from anthropic import AsyncAnthropic, APITimeoutError, RateLimitError, InternalServerError
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+logger = logging.getLogger(__name__)
 
 from engine.financial import metrics as m
 from engine.financial.models import DealInput, LoanInput, OperatingAssumptions, ExitAssumptions
@@ -233,9 +237,9 @@ COMPUTED METRICS:
 - Cash-on-cash (Yr 1): {math['coc']:.1%}
 - IRR range: {math['irr_low']:.1%} – {math['irr_high']:.1%}
 - GRM: {math['grm']:.1f}x
-- Price/unit: ${math['price_per_unit']:,.0f} {f"" if math['price_per_unit'] else "(N/A)"}
-- Price/SF: ${math['price_per_sf']:.2f} {f"" if math['price_per_sf'] else "(N/A)"}
-- Suggested max price (at {thresholds['target_cap_rate']:.1%} cap): ${math['max_price_at_target_cap']:,.0f if math['max_price_at_target_cap'] else 'N/A'}
+- Price/unit: {f"${math['price_per_unit']:,.0f}" if math['price_per_unit'] else "N/A"}
+- Price/SF: {f"${math['price_per_sf']:.2f}" if math['price_per_sf'] else "N/A"}
+- Suggested max price (at {thresholds['target_cap_rate']:.1%} cap): {f"${math['max_price_at_target_cap']:,.0f}" if math['max_price_at_target_cap'] else "N/A"}
 
 SCREENING THRESHOLDS:
 - Minimum: {thresholds['min_cap_rate']:.1%} cap, {thresholds['min_dscr']:.2f}x DSCR, {thresholds['min_coc']:.0%} CoC, {thresholds['min_irr']:.0%} IRR
@@ -259,11 +263,7 @@ Verdict definitions:
 
 Be direct. Real investors don't need hedging — they need a clear signal."""
 
-        response = await self.client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=1024,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        response = await self._call_api(prompt)
 
         raw = response.content[0].text.strip()
         # Strip markdown fences if present
@@ -271,7 +271,19 @@ Be direct. Real investors don't need hedging — they need a clear signal."""
             raw = raw.split("```")[1]
             if raw.startswith("json"):
                 raw = raw[4:]
-        ai = json.loads(raw)
+        try:
+            ai = json.loads(raw)
+        except json.JSONDecodeError:
+            logger.warning("DealScreener: failed to parse LLM JSON, returning conservative verdict")
+            ai = {
+                "verdict": "SOFT_GO",
+                "confidence": "LOW",
+                "headline": "AI analysis unavailable — review metrics manually.",
+                "strengths": [],
+                "concerns": ["AI response could not be parsed"],
+                "missing_info": [],
+                "full_reasoning": "",
+            }
 
         return ScreenVerdict(
             verdict=ai["verdict"],
@@ -289,4 +301,17 @@ Be direct. Real investors don't need hedging — they need a clear signal."""
             missing_info=ai.get("missing_info", []),
             suggested_max_price=math["max_price_at_target_cap"],
             full_reasoning=ai.get("full_reasoning", ""),
+        )
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type((APITimeoutError, RateLimitError, InternalServerError)),
+        reraise=True,
+    )
+    async def _call_api(self, prompt: str):
+        return await self.client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=1024,
+            messages=[{"role": "user", "content": prompt}],
         )

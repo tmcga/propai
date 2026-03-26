@@ -17,11 +17,11 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
 
-from ..engine.financial import ProFormaEngine, WaterfallEngine
-from ..engine.financial.models import DealInput
-from ..agents.memo_agent import MemoAgent, InvestmentMemo
-from ..agents.deal_parser import DealParser, ParseResult
-from ..data.market_service import MarketService
+from engine.financial import ProFormaEngine, WaterfallEngine
+from engine.financial.models import DealInput
+from agents.memo_agent import MemoAgent, InvestmentMemo
+from agents.deal_parser import DealParser, ParseResult
+from data.market_service import MarketService
 
 router = APIRouter(prefix="/api/ai", tags=["AI"])
 
@@ -284,8 +284,8 @@ async def demo_memo():
     Uses placeholder narrative text so no API key is required.
     Perfect for UI development and showcasing the design.
     """
-    from ..api.underwriting import sample_deal
-    from ..engine.financial.models import (
+    from api.underwriting import sample_deal
+    from engine.financial.models import (
         LoanInput, OperatingAssumptions, ExitAssumptions, EquityStructure, LoanType, AssetClass
     )
 

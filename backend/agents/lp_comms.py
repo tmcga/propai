@@ -19,10 +19,14 @@ Claude only writes prose.
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from anthropic import AsyncAnthropic
+from anthropic import AsyncAnthropic, APITimeoutError, RateLimitError, InternalServerError
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+logger = logging.getLogger(__name__)
 
 
 # ── Input types ───────────────────────────────────────────────────────────
@@ -198,35 +202,23 @@ class LPCommsAgent:
         context = self._build_context(inp)
         comm_prompt = COMM_PROMPTS.get(inp.comm_type, COMM_PROMPTS["monthly_update"])
 
-        response = await self.client.messages.create(
-            model="claude-opus-4-6",
-            max_tokens=4096,
-            system=SYSTEM_PROMPT,
-            messages=[{
-                "role": "user",
-                "content": f"""{comm_prompt}
-
-COMMUNICATION CONTEXT:
-{context}
-
-Return a JSON object with these exact keys:
-{{
-  "subject_line": "Email subject line",
-  "body_markdown": "Full communication body in markdown",
-  "key_numbers": {{"metric name": "formatted value", ...}},
-  "action_items": ["action 1", "action 2"]
-}}
-
-Return ONLY valid JSON."""
-            }],
-        )
+        response = await self._call_api(comm_prompt, context)
 
         raw = response.content[0].text.strip()
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"):
                 raw = raw[4:]
-        data = json.loads(raw.strip())
+        try:
+            data = json.loads(raw.strip())
+        except json.JSONDecodeError:
+            logger.warning("LPComms: failed to parse LLM JSON response")
+            data = {
+                "subject_line": f"{inp.fund_name} — {inp.period} Update",
+                "body_markdown": "Communication generation failed. Please retry.",
+                "key_numbers": {},
+                "action_items": [],
+            }
 
         disclaimer = ""
         if inp.include_disclaimer:
@@ -304,3 +296,33 @@ Return ONLY valid JSON."""
             lines.append(f"\nGP NOTES / ADDITIONAL CONTEXT:\n{inp.additional_context}")
 
         return "\n".join(lines)
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type((APITimeoutError, RateLimitError, InternalServerError)),
+        reraise=True,
+    )
+    async def _call_api(self, comm_prompt: str, context: str):
+        return await self.client.messages.create(
+            model="claude-opus-4-6",
+            max_tokens=4096,
+            system=SYSTEM_PROMPT,
+            messages=[{
+                "role": "user",
+                "content": f"""{comm_prompt}
+
+COMMUNICATION CONTEXT:
+{context}
+
+Return a JSON object with these exact keys:
+{{
+  "subject_line": "Email subject line",
+  "body_markdown": "Full communication body in markdown",
+  "key_numbers": {{"metric name": "formatted value", ...}},
+  "action_items": ["action 1", "action 2"]
+}}
+
+Return ONLY valid JSON."""
+            }],
+        )

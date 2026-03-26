@@ -6,8 +6,10 @@ Supports: SFR, Multifamily, Commercial, Industrial, STR, Ground-Up Development
 """
 
 from .models import (
+    AssetClass,
     DealInput,
     LoanInput,
+    LoanType,
     OperatingAssumptions,
     ExitAssumptions,
     EquityStructure,
@@ -21,7 +23,9 @@ from .dcf import DCFEngine
 from .waterfall import WaterfallEngine
 
 __all__ = [
+    "AssetClass",
     "DealInput",
+    "LoanType",
     "LoanInput",
     "OperatingAssumptions",
     "ExitAssumptions",

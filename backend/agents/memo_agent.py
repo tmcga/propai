@@ -25,6 +25,7 @@ from typing import Optional
 from pathlib import Path
 
 import anthropic
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 logger = logging.getLogger(__name__)
 
@@ -246,16 +247,16 @@ class MemoAgent:
     ):
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY", "")
         self.model = model
-        self._client: Optional[anthropic.Anthropic] = None
+        self._client: Optional[anthropic.AsyncAnthropic] = None
 
-    def _get_client(self) -> anthropic.Anthropic:
+    def _get_client(self) -> anthropic.AsyncAnthropic:
         if not self._client:
             if not self.api_key:
                 raise ValueError(
                     "ANTHROPIC_API_KEY is not set. "
                     "Get a free key at console.anthropic.com and add it to your .env file."
                 )
-            self._client = anthropic.Anthropic(api_key=self.api_key)
+            self._client = anthropic.AsyncAnthropic(api_key=self.api_key)
         return self._client
 
     async def generate(
@@ -359,17 +360,22 @@ class MemoAgent:
         )
 
         client = self._get_client()
+        message = await self._call_api(client, prompt)
+        return message.content[0].text.strip()
 
-        # Use the synchronous client in a thread-safe way
-        # (In production, swap to AsyncAnthropic for full async)
-        message = client.messages.create(
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type((anthropic.APITimeoutError, anthropic.RateLimitError, anthropic.InternalServerError)),
+        reraise=True,
+    )
+    async def _call_api(self, client: anthropic.AsyncAnthropic, prompt: str):
+        return await client.messages.create(
             model=self.model,
             max_tokens=1024,
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": prompt}],
         )
-
-        return message.content[0].text.strip()
 
     # ------------------------------------------------------------------
     # Context builders — serialize structured data into LLM-friendly text

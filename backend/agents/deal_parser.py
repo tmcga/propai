@@ -23,8 +23,9 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 import anthropic
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
-from ..engine.financial.models import (
+from engine.financial.models import (
     DealInput,
     AssetClass,
     LoanInput,
@@ -171,13 +172,13 @@ class DealParser:
     def __init__(self, api_key: Optional[str] = None, model: str = "claude-sonnet-4-6"):
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY", "")
         self.model = model
-        self._client: Optional[anthropic.Anthropic] = None
+        self._client: Optional[anthropic.AsyncAnthropic] = None
 
-    def _get_client(self) -> anthropic.Anthropic:
+    def _get_client(self) -> anthropic.AsyncAnthropic:
         if not self._client:
             if not self.api_key:
                 raise ValueError("ANTHROPIC_API_KEY is not set.")
-            self._client = anthropic.Anthropic(api_key=self.api_key)
+            self._client = anthropic.AsyncAnthropic(api_key=self.api_key)
         return self._client
 
     async def parse(self, text: str) -> ParseResult:
@@ -200,17 +201,7 @@ class DealParser:
         try:
             client = self._get_client()
 
-            message = client.messages.create(
-                model=self.model,
-                max_tokens=2048,
-                system=PARSER_SYSTEM_PROMPT,
-                tools=[EXTRACTION_SCHEMA],
-                tool_choice={"type": "tool", "name": "extract_deal"},
-                messages=[{
-                    "role": "user",
-                    "content": f"Extract deal parameters from this description:\n\n{text}"
-                }],
-            )
+            message = await self._call_api(client, text)
 
             # Extract tool use result
             tool_result = None
@@ -243,6 +234,26 @@ class DealParser:
             logger.error("DealParser error", exc_info=True)
 
         return result
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type((anthropic.APITimeoutError, anthropic.RateLimitError, anthropic.InternalServerError)),
+        reraise=True,
+    )
+    async def _call_api(self, client: anthropic.AsyncAnthropic, text: str):
+        """Call the Anthropic API with retry logic for transient failures."""
+        return await client.messages.create(
+            model=self.model,
+            max_tokens=2048,
+            system=PARSER_SYSTEM_PROMPT,
+            tools=[EXTRACTION_SCHEMA],
+            tool_choice={"type": "tool", "name": "extract_deal"},
+            messages=[{
+                "role": "user",
+                "content": f"Extract deal parameters from this description:\n\n{text}"
+            }],
+        )
 
     def _build_deal_input(self, raw: dict) -> DealInput:
         """Convert raw Claude extraction into a validated DealInput."""

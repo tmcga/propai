@@ -12,14 +12,14 @@ import time
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
-from ..engine.financial import (
+from engine.financial import (
     DealInput,
     UnderwritingResult,
     ProFormaEngine,
     WaterfallEngine,
     AssetClass,
 )
-from ..engine.financial.models import (
+from engine.financial.models import (
     LoanInput,
     OperatingAssumptions,
     ExitAssumptions,

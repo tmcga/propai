@@ -16,10 +16,10 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 
-from ..data.market_service import MarketService, MarketReport
-from ..data.fred import FREDClient, MacroSnapshot, MortgageRates
-from ..data.hud import HUDClient, FairMarketRents
-from ..data.census import CensusClient, DemographicProfile
+from data.market_service import MarketService, MarketReport
+from data.fred import FREDClient, MacroSnapshot, MortgageRates
+from data.hud import HUDClient, FairMarketRents
+from data.census import CensusClient, DemographicProfile
 
 router = APIRouter(prefix="/api/market", tags=["market research"])
 

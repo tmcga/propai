@@ -18,12 +18,16 @@ vs. present but ambiguous — so the caller knows what to verify.
 from __future__ import annotations
 
 import json
+import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from anthropic import AsyncAnthropic
+from anthropic import AsyncAnthropic, APITimeoutError, RateLimitError, InternalServerError
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+logger = logging.getLogger(__name__)
 
 from engine.financial.models import (
     AssetClass,
@@ -260,13 +264,7 @@ class DocumentParser:
             "confidence": "HIGH|MEDIUM|LOW",
         }
 
-        response = await self.client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=4096,
-            system=OM_SYSTEM,
-            messages=[{
-                "role": "user",
-                "content": f"""Parse this offering memorandum and return structured JSON matching this schema:
+        content = f"""Parse this offering memorandum and return structured JSON matching this schema:
 
 {json.dumps(schema, indent=2)}
 
@@ -274,11 +272,15 @@ DOCUMENT TEXT:
 {text}
 
 Return ONLY valid JSON. No markdown, no commentary outside the JSON."""
-            }],
-        )
+        response = await self._call_api("claude-sonnet-4-6", 4096, OM_SYSTEM, content)
 
         raw = self._strip_fences(response.content[0].text)
-        data = json.loads(raw)
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            logger.warning("DocumentParser: failed to parse OM JSON response")
+            return ParsedDocument(doc_type="om", deal_input=None, t12=None, rent_roll=None,
+                                  confidence="LOW", red_flags=["AI response could not be parsed"])
         return self._build_om_result(data, len(text))
 
     def _build_om_result(self, data: dict, text_chars: int) -> ParsedDocument:
@@ -350,13 +352,7 @@ Return ONLY valid JSON. No markdown, no commentary outside the JSON."""
     # ── T-12 Parser ───────────────────────────────────────────────────────
 
     async def _parse_t12(self, text: str) -> ParsedDocument:
-        response = await self.client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=3000,
-            system=T12_SYSTEM,
-            messages=[{
-                "role": "user",
-                "content": f"""Parse this T-12 operating statement into structured JSON:
+        content = f"""Parse this T-12 operating statement into structured JSON:
 
 {{
   "months_of_data": 12,
@@ -389,11 +385,15 @@ DOCUMENT TEXT:
 {text}
 
 Return ONLY valid JSON."""
-            }],
-        )
+        response = await self._call_api("claude-sonnet-4-6", 3000, T12_SYSTEM, content)
 
         raw = self._strip_fences(response.content[0].text)
-        data = json.loads(raw)
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            logger.warning("DocumentParser: failed to parse T-12 JSON response")
+            return ParsedDocument(doc_type="t12", deal_input=None, t12=None, rent_roll=None,
+                                  confidence="LOW", red_flags=["AI response could not be parsed"])
         inc = data.get("income", {})
         exp = data.get("expenses", {})
 
@@ -435,13 +435,7 @@ Return ONLY valid JSON."""
     # ── Rent Roll Parser ──────────────────────────────────────────────────
 
     async def _parse_rent_roll(self, text: str) -> ParsedDocument:
-        response = await self.client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=4096,
-            system=RENT_ROLL_SYSTEM,
-            messages=[{
-                "role": "user",
-                "content": f"""Parse this rent roll into structured JSON:
+        content = f"""Parse this rent roll into structured JSON:
 
 {{
   "total_units": null,
@@ -477,11 +471,15 @@ DOCUMENT TEXT:
 {text}
 
 Return ONLY valid JSON. If the rent roll has many units, summarize the units array to a representative sample plus accurate aggregate summary."""
-            }],
-        )
+        response = await self._call_api("claude-sonnet-4-6", 4096, RENT_ROLL_SYSTEM, content)
 
         raw = self._strip_fences(response.content[0].text)
-        data = json.loads(raw)
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            logger.warning("DocumentParser: failed to parse rent roll JSON response")
+            return ParsedDocument(doc_type="rent_roll", deal_input=None, t12=None, rent_roll=None,
+                                  confidence="LOW", red_flags=["AI response could not be parsed"])
         summary_data = data.get("summary", {})
 
         total = data.get("total_units") or 0
@@ -521,6 +519,20 @@ Return ONLY valid JSON. If the rent roll has many units, summarize the units arr
             red_flags=data.get("red_flags", []),
             confidence="HIGH" if total > 0 else "LOW",
             raw_text_chars=len(text),
+        )
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type((APITimeoutError, RateLimitError, InternalServerError)),
+        reraise=True,
+    )
+    async def _call_api(self, model: str, max_tokens: int, system: str, content: str):
+        return await self.client.messages.create(
+            model=model,
+            max_tokens=max_tokens,
+            system=system,
+            messages=[{"role": "user", "content": content}],
         )
 
     @staticmethod

@@ -136,9 +136,9 @@ async def parse_document(
         try:
             text = content.decode("utf-8")
         except UnicodeDecodeError:
-            # Write to temp file for PDF extraction
+            # Write to temp file for PDF extraction (ignore user-supplied filename for safety)
             import tempfile, os
-            suffix = ".pdf" if file.filename and file.filename.endswith(".pdf") else ".txt"
+            suffix = ".pdf" if file.content_type == "application/pdf" else ".txt"
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                 tmp.write(content)
                 tmp_path = tmp.name
