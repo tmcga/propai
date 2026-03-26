@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{{ memo.deal_name }} — Investment Memo</title>
+  <style>
+    /* ── Reset & Base ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:      #0f2044;
+      --navy-mid:  #1a3a6b;
+      --accent:    #1e6bb8;
+      --accent-lt: #e8f1fb;
+      --gold:      #c4972a;
+      --green:     #1a7a4a;
+      --red:       #c0392b;
+      --gray-100:  #f7f8fa;
+      --gray-200:  #edf0f4;
+      --gray-400:  #9aa3b0;
+      --gray-700:  #3d4a5c;
+      --text:      #1c2636;
+      --serif:     "Georgia", "Times New Roman", serif;
+      --sans:      "Helvetica Neue", "Arial", sans-serif;
+    }
+
+    @page {
+      size: letter;
+      margin: 0.75in 0.85in;
+      @top-right { content: "CONFIDENTIAL — FOR DISCUSSION PURPOSES ONLY"; font-size: 7pt; color: var(--gray-400); font-family: var(--sans); }
+      @bottom-center { content: counter(page) " of " counter(pages); font-size: 8pt; color: var(--gray-400); font-family: var(--sans); }
+    }
+
+    body {
+      font-family: var(--sans);
+      font-size: 9.5pt;
+      line-height: 1.55;
+      color: var(--text);
+      background: #fff;
+    }
+
+    /* ── Cover / Header ───────────────────────────────────────── */
+    .cover {
+      background: var(--navy);
+      color: #fff;
+      padding: 2.5rem 2.5rem 2rem;
+      margin: -0.75in -0.85in 0;
+      page-break-after: avoid;
+    }
+
+    .cover-label {
+      font-size: 7pt;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.5);
+      margin-bottom: 0.75rem;
+    }
+
+    .cover-title {
+      font-family: var(--serif);
+      font-size: 22pt;
+      font-weight: normal;
+      line-height: 1.2;
+      color: #fff;
+      margin-bottom: 0.4rem;
+    }
+
+    .cover-subtitle {
+      font-size: 10pt;
+      color: rgba(255,255,255,0.65);
+      margin-bottom: 1.5rem;
+    }
+
+    .cover-meta {
+      display: flex;
+      gap: 2rem;
+      border-top: 1px solid rgba(255,255,255,0.15);
+      padding-top: 0.9rem;
+      margin-top: 0.5rem;
+    }
+
+    .cover-meta-item { font-size: 8pt; color: rgba(255,255,255,0.55); }
+    .cover-meta-item strong { display: block; color: #fff; font-size: 9pt; }
+
+    /* ── Key Metrics Bar ──────────────────────────────────────── */
+    .metrics-bar {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      background: var(--accent-lt);
+      border: 1px solid #c5d9f0;
+      border-radius: 4px;
+      margin: 1.2rem 0;
+      overflow: hidden;
+    }
+
+    .metric-cell {
+      padding: 0.7rem 0.6rem;
+      text-align: center;
+      border-right: 1px solid #c5d9f0;
+    }
+    .metric-cell:last-child { border-right: none; }
+
+    .metric-label {
+      font-size: 6.5pt;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--gray-400);
+      margin-bottom: 0.2rem;
+    }
+
+    .metric-value {
+      font-size: 13pt;
+      font-weight: 700;
+      color: var(--navy);
+      line-height: 1.1;
+    }
+
+    .metric-value.positive { color: var(--green); }
+    .metric-value.accent   { color: var(--accent); }
+
+    /* ── Section Headers ──────────────────────────────────────── */
+    h2.section-header {
+      font-family: var(--serif);
+      font-size: 12pt;
+      font-weight: normal;
+      color: var(--navy);
+      border-bottom: 2px solid var(--navy);
+      padding-bottom: 0.3rem;
+      margin: 1.6rem 0 0.75rem;
+      page-break-after: avoid;
+    }
+
+    h2.section-header::before {
+      content: attr(data-num) "  ";
+      color: var(--gold);
+      font-style: italic;
+    }
+
+    /* ── Body text ────────────────────────────────────────────── */
+    .prose p { margin-bottom: 0.6rem; }
+    .prose p:last-child { margin-bottom: 0; }
+
+    .prose strong { color: var(--navy-mid); }
+
+    .prose ul, .prose ol {
+      margin: 0.4rem 0 0.6rem 1.2rem;
+    }
+    .prose li { margin-bottom: 0.25rem; }
+
+    /* ── Pro Forma Table ──────────────────────────────────────── */
+    .table-wrap {
+      overflow-x: auto;
+      margin: 0.8rem 0;
+    }
+
+    table.proforma {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 8pt;
+    }
+
+    table.proforma thead tr {
+      background: var(--navy);
+      color: #fff;
+    }
+
+    table.proforma thead th {
+      padding: 0.45rem 0.5rem;
+      text-align: right;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    table.proforma thead th:first-child { text-align: left; }
+
+    table.proforma tbody tr:nth-child(even) { background: var(--gray-100); }
+    table.proforma tbody tr:hover { background: var(--accent-lt); }
+
+    table.proforma tbody td {
+      padding: 0.4rem 0.5rem;
+      text-align: right;
+      border-bottom: 1px solid var(--gray-200);
+    }
+    table.proforma tbody td:first-child { text-align: left; font-weight: 500; }
+
+    table.proforma tfoot tr { background: var(--gray-200); font-weight: 700; }
+    table.proforma tfoot td {
+      padding: 0.45rem 0.5rem;
+      text-align: right;
+      border-top: 2px solid var(--navy);
+    }
+    table.proforma tfoot td:first-child { text-align: left; }
+
+    .row-noi td    { background: #edf7f1 !important; font-weight: 600; color: var(--green); }
+    .row-btcf td   { background: #e8f1fb !important; font-weight: 600; color: var(--accent); }
+
+    /* ── Sensitivity Table ────────────────────────────────────── */
+    table.sensitivity {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 8pt;
+      text-align: center;
+    }
+
+    table.sensitivity th {
+      background: var(--navy);
+      color: #fff;
+      padding: 0.4rem 0.5rem;
+      font-weight: 600;
+    }
+
+    table.sensitivity td {
+      padding: 0.35rem 0.5rem;
+      border: 1px solid var(--gray-200);
+    }
+
+    .sens-high   { background: #d4edda; color: #155724; font-weight: 600; }
+    .sens-mid    { background: #fff3cd; color: #856404; }
+    .sens-low    { background: #f8d7da; color: #721c24; }
+    .sens-base   { background: var(--accent-lt); font-weight: 700; border: 2px solid var(--accent) !important; }
+
+    /* ── Highlights box ───────────────────────────────────────── */
+    .highlights-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.6rem;
+      margin: 0.5rem 0;
+    }
+
+    .highlight-item {
+      background: var(--gray-100);
+      border-left: 3px solid var(--accent);
+      padding: 0.5rem 0.65rem;
+      border-radius: 0 3px 3px 0;
+      font-size: 8.5pt;
+    }
+
+    /* ── Risk table ───────────────────────────────────────────── */
+    .risk-item {
+      margin-bottom: 0.8rem;
+      padding-bottom: 0.8rem;
+      border-bottom: 1px solid var(--gray-200);
+    }
+    .risk-item:last-child { border-bottom: none; }
+    .risk-label { font-weight: 700; color: var(--navy-mid); margin-bottom: 0.15rem; }
+    .risk-body  { font-size: 8.5pt; color: var(--gray-700); }
+
+    /* ── Warning banner ───────────────────────────────────────── */
+    .warning-banner {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-left: 4px solid #ffc107;
+      padding: 0.5rem 0.75rem;
+      border-radius: 3px;
+      font-size: 8pt;
+      margin: 0.5rem 0;
+    }
+
+    /* ── Waterfall section ────────────────────────────────────── */
+    .waterfall-tier {
+      display: flex;
+      align-items: center;
+      padding: 0.4rem 0.6rem;
+      margin-bottom: 0.3rem;
+      background: var(--gray-100);
+      border-radius: 3px;
+      font-size: 8.5pt;
+    }
+    .waterfall-tier-name  { flex: 2; font-weight: 600; }
+    .waterfall-tier-lp    { flex: 1; text-align: right; color: var(--accent); }
+    .waterfall-tier-gp    { flex: 1; text-align: right; color: var(--gold); }
+
+    /* ── Disclaimer ───────────────────────────────────────────── */
+    .disclaimer {
+      margin-top: 2rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--gray-200);
+      font-size: 7pt;
+      color: var(--gray-400);
+      line-height: 1.4;
+    }
+
+    /* ── Utilities ────────────────────────────────────────────── */
+    .page-break { page-break-before: always; }
+    .avoid-break { page-break-inside: avoid; }
+    .text-right { text-align: right; }
+    .text-green { color: var(--green); }
+    .text-red   { color: var(--red); }
+    .caption {
+      font-size: 7.5pt;
+      color: var(--gray-400);
+      font-style: italic;
+      margin-top: 0.2rem;
+    }
+
+    /* markdown rendering helpers */
+    .prose h3 { font-size: 9.5pt; font-weight: 700; color: var(--navy-mid); margin: 0.6rem 0 0.2rem; }
+  </style>
+</head>
+<body>
+
+<!-- ══ COVER ════════════════════════════════════════════════════════ -->
+<div class="cover">
+  <div class="cover-label">Investment Memorandum — Confidential</div>
+  <div class="cover-title">{{ memo.deal_name }}</div>
+  <div class="cover-subtitle">
+    {{ deal.asset_class.value.replace('_', ' ').title() }}
+    {% if deal.market %} &middot; {{ deal.market }}{% endif %}
+    {% if deal.units %} &middot; {{ deal.units }} Units{% endif %}
+  </div>
+  <div class="cover-meta">
+    <div class="cover-meta-item">
+      <strong>${{ "{:,.0f}".format(deal.purchase_price) }}</strong>
+      Purchase Price
+    </div>
+    <div class="cover-meta-item">
+      <strong>${{ "{:,.0f}".format(result.equity_invested) }}</strong>
+      Equity Required
+    </div>
+    <div class="cover-meta-item">
+      <strong>{{ "{:.1%}".format(result.metrics.levered_irr) }}</strong>
+      Projected IRR
+    </div>
+    <div class="cover-meta-item">
+      <strong>{{ "{:.2f}x".format(result.metrics.equity_multiple) }}</strong>
+      Equity Multiple
+    </div>
+    <div class="cover-meta-item">
+      <strong>{{ memo.prepared_date }}</strong>
+      Date Prepared
+    </div>
+    <div class="cover-meta-item">
+      <strong>{{ memo.prepared_by }}</strong>
+      Prepared By
+    </div>
+  </div>
+</div>
+
+<!-- ══ KEY METRICS BAR ══════════════════════════════════════════════ -->
+<div class="metrics-bar">
+  <div class="metric-cell">
+    <div class="metric-label">Cap Rate</div>
+    <div class="metric-value accent">{{ "{:.2%}".format(result.metrics.going_in_cap_rate) }}</div>
+  </div>
+  <div class="metric-cell">
+    <div class="metric-label">Cash-on-Cash (Yr 1)</div>
+    <div class="metric-value {% if result.metrics.cash_on_cash_yr1 > 0.06 %}positive{% endif %}">
+      {{ "{:.2%}".format(result.metrics.cash_on_cash_yr1) }}
+    </div>
+  </div>
+  <div class="metric-cell">
+    <div class="metric-label">DSCR</div>
+    <div class="metric-value {% if result.metrics.dscr_yr1 >= 1.25 %}positive{% endif %}">
+      {{ "{:.2f}x".format(result.metrics.dscr_yr1) }}
+    </div>
+  </div>
+  <div class="metric-cell">
+    <div class="metric-label">Levered IRR</div>
+    <div class="metric-value accent">{{ "{:.1%}".format(result.metrics.levered_irr) }}</div>
+  </div>
+  <div class="metric-cell">
+    <div class="metric-label">Equity Multiple</div>
+    <div class="metric-value {% if result.metrics.equity_multiple >= 1.8 %}positive{% endif %}">
+      {{ "{:.2f}x".format(result.metrics.equity_multiple) }}
+    </div>
+  </div>
+  <div class="metric-cell">
+    <div class="metric-label">Hold Period</div>
+    <div class="metric-value">{{ deal.exit.hold_period_years }} Yrs</div>
+  </div>
+</div>
+
+<!-- ══ UNDERWRITING WARNINGS ════════════════════════════════════════ -->
+{% if result.warnings %}
+{% for warning in result.warnings %}
+<div class="warning-banner">{{ warning }}</div>
+{% endfor %}
+{% endif %}
+
+<!-- ══ 1. EXECUTIVE SUMMARY ═════════════════════════════════════════ -->
+<h2 class="section-header" data-num="1">Executive Summary</h2>
+<div class="prose">{{ memo.executive_summary | markdown_to_html }}</div>
+
+<!-- ══ 2. INVESTMENT HIGHLIGHTS ═════════════════════════════════════ -->
+<h2 class="section-header" data-num="2">Investment Highlights</h2>
+<div class="prose">{{ memo.investment_highlights | markdown_to_html }}</div>
+
+<!-- ══ 3. MARKET ANALYSIS ════════════════════════════════════════════ -->
+<h2 class="section-header" data-num="3">Market Analysis</h2>
+<div class="prose">{{ memo.market_analysis | markdown_to_html }}</div>
+
+{% if market and market.demographics %}
+<div class="highlights-grid" style="margin-top:0.6rem;">
+  {% if market.demographics.total_population %}
+  <div class="highlight-item"><strong>Population:</strong> {{ "{:,}".format(market.demographics.total_population) }}</div>
+  {% endif %}
+  {% if market.demographics.median_household_income %}
+  <div class="highlight-item"><strong>Median HH Income:</strong> ${{ "{:,}".format(market.demographics.median_household_income) }}</div>
+  {% endif %}
+  {% if market.demographics.vacancy_rate %}
+  <div class="highlight-item"><strong>Housing Vacancy:</strong> {{ "{:.1%}".format(market.demographics.vacancy_rate) }}</div>
+  {% endif %}
+  {% if market.demographics.renter_rate %}
+  <div class="highlight-item"><strong>Renter Rate:</strong> {{ "{:.1%}".format(market.demographics.renter_rate) }}</div>
+  {% endif %}
+  {% if market.zillow and market.zillow.zori_yoy_pct %}
+  <div class="highlight-item"><strong>Rent Growth (YoY):</strong> {{ "{:.1f}%".format(market.zillow.zori_yoy_pct) }}</div>
+  {% endif %}
+  {% if market.macro and market.macro.mortgage_rates %}
+  <div class="highlight-item"><strong>30-Yr Mortgage Rate:</strong> {{ "{:.2f}%".format(market.macro.mortgage_rates.rate_30yr) }}</div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- ══ 4. INVESTMENT THESIS ══════════════════════════════════════════ -->
+<h2 class="section-header" data-num="4">Investment Thesis</h2>
+<div class="prose">{{ memo.investment_thesis | markdown_to_html }}</div>
+
+<!-- ══ 5. FINANCIAL SUMMARY ══════════════════════════════════════════ -->
+<h2 class="section-header" data-num="5">Financial Summary</h2>
+<div class="prose">{{ memo.financial_summary | markdown_to_html }}</div>
+
+<!-- ══ 6. PRO FORMA (new page) ══════════════════════════════════════ -->
+<div class="page-break"></div>
+<h2 class="section-header" data-num="6">Annual Pro Forma</h2>
+<p class="caption">Figures in USD. All projections are estimates based on stated assumptions. See sensitivity analysis below.</p>
+
+<div class="table-wrap avoid-break">
+<table class="proforma">
+  <thead>
+    <tr>
+      <th>Line Item</th>
+      {% for yr in result.pro_forma %}
+      <th>Year {{ yr.year }}</th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Gross Scheduled Income</td>
+      {% for yr in result.pro_forma %}
+      <td>${{ "{:,.0f}".format(yr.gross_scheduled_income) }}</td>
+      {% endfor %}
+    </tr>
+    <tr>
+      <td>(Vacancy + Credit Loss)</td>
+      {% for yr in result.pro_forma %}
+      <td class="text-red">(${{ "{:,.0f}".format(yr.vacancy_loss + yr.credit_loss) }})</td>
+      {% endfor %}
+    </tr>
+    <tr>
+      <td>Other Income</td>
+      {% for yr in result.pro_forma %}
+      <td>${{ "{:,.0f}".format(yr.other_income) }}</td>
+      {% endfor %}
+    </tr>
+    <tr style="font-weight:600; border-top:1px solid #ccc;">
+      <td>Effective Gross Income</td>
+      {% for yr in result.pro_forma %}
+      <td>${{ "{:,.0f}".format(yr.effective_gross_income) }}</td>
+      {% endfor %}
+    </tr>
+    <tr><td colspan="{{ result.pro_forma|length + 1 }}" style="padding:0.2rem;background:#f0f0f0;"></td></tr>
+    <tr>
+      <td>Property Taxes</td>
+      {% for yr in result.pro_forma %}
+      <td>(${{ "{:,.0f}".format(yr.property_taxes) }})</td>
+      {% endfor %}
+    </tr>
+    <tr>
+      <td>Insurance</td>
+      {% for yr in result.pro_forma %}
+      <td>(${{ "{:,.0f}".format(yr.insurance) }})</td>
+      {% endfor %}
+    </tr>
+    <tr>
+      <td>Management Fee</td>
+      {% for yr in result.pro_forma %}
+      <td>(${{ "{:,.0f}".format(yr.management_fee) }})</td>
+      {% endfor %}
+    </tr>
+    <tr>
+      <td>Maintenance & Reserves</td>
+      {% for yr in result.pro_forma %}
+      <td>(${{ "{:,.0f}".format(yr.maintenance_reserves + yr.capex_reserves) }})</td>
+      {% endfor %}
+    </tr>
+    {% if result.pro_forma[0].utilities > 0 %}
+    <tr>
+      <td>Utilities</td>
+      {% for yr in result.pro_forma %}
+      <td>(${{ "{:,.0f}".format(yr.utilities) }})</td>
+      {% endfor %}
+    </tr>
+    {% endif %}
+    <tr class="row-noi">
+      <td>Net Operating Income</td>
+      {% for yr in result.pro_forma %}
+      <td>${{ "{:,.0f}".format(yr.net_operating_income) }}</td>
+      {% endfor %}
+    </tr>
+    <tr>
+      <td>Debt Service</td>
+      {% for yr in result.pro_forma %}
+      <td>(${{ "{:,.0f}".format(yr.debt_service) }})</td>
+      {% endfor %}
+    </tr>
+    <tr class="row-btcf">
+      <td>Before-Tax Cash Flow</td>
+      {% for yr in result.pro_forma %}
+      <td class="{% if yr.before_tax_cash_flow >= 0 %}text-green{% else %}text-red{% endif %}">
+        {% if yr.before_tax_cash_flow >= 0 %}${% else %}(${% endif %}{{ "{:,.0f}".format(yr.before_tax_cash_flow | abs) }}{% if yr.before_tax_cash_flow < 0 %}){% endif %}
+      </td>
+      {% endfor %}
+    </tr>
+    <tr>
+      <td>Loan Balance (EOY)</td>
+      {% for yr in result.pro_forma %}
+      <td>${{ "{:,.0f}".format(yr.loan_balance) }}</td>
+      {% endfor %}
+    </tr>
+    {% if deal.units %}
+    <tr>
+      <td>NOI / Unit</td>
+      {% for yr in result.pro_forma %}
+      <td>${{ "{:,.0f}".format(yr.noi_per_unit) if yr.noi_per_unit else '—' }}</td>
+      {% endfor %}
+    </tr>
+    {% endif %}
+  </tbody>
+</table>
+</div>
+
+<!-- ══ 7. SENSITIVITY ANALYSIS ══════════════════════════════════════ -->
+{% if result.irr_sensitivity %}
+<h2 class="section-header" data-num="7">Sensitivity Analysis</h2>
+<p class="caption">Levered IRR sensitivity to exit cap rate (rows) and annual rent growth (columns). Base case highlighted in blue.</p>
+
+<div class="table-wrap avoid-break">
+<table class="sensitivity">
+  <thead>
+    <tr>
+      <th>Exit Cap \ Rent Growth</th>
+      {% for col in result.irr_sensitivity.col_values %}
+      <th>{{ "{:.1%}".format(col) }}</th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for r_idx, row in enumerate(result.irr_sensitivity.data) %}
+    <tr>
+      <th>{{ "{:.2%}".format(result.irr_sensitivity.row_values[r_idx]) }}</th>
+      {% for c_idx, val in enumerate(row) %}
+      {% set is_base = (r_idx == 2 and c_idx == 2) %}
+      {% if val != val %}  {# NaN check #}
+      <td>—</td>
+      {% elif val >= 0.15 %}
+      <td class="{% if is_base %}sens-base{% else %}sens-high{% endif %}">{{ "{:.1%}".format(val) }}</td>
+      {% elif val >= 0.10 %}
+      <td class="{% if is_base %}sens-base{% else %}sens-mid{% endif %}">{{ "{:.1%}".format(val) }}</td>
+      {% else %}
+      <td class="{% if is_base %}sens-base{% else %}sens-low{% endif %}">{{ "{:.1%}".format(val) }}</td>
+      {% endif %}
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+
+<!-- ══ 8. RISK FACTORS ═══════════════════════════════════════════════ -->
+<h2 class="section-header" data-num="8">Risk Factors</h2>
+<div class="prose">{{ memo.risk_factors | markdown_to_html }}</div>
+
+<!-- ══ 9. EXIT STRATEGY ══════════════════════════════════════════════ -->
+<h2 class="section-header" data-num="9">Exit Strategy</h2>
+<div class="prose">{{ memo.exit_strategy | markdown_to_html }}</div>
+
+<!-- ══ 10. WATERFALL (if applicable) ════════════════════════════════ -->
+{% if result.waterfall %}
+<h2 class="section-header" data-num="10">Equity Waterfall</h2>
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:0.8rem;">
+  <div>
+    <table class="proforma" style="font-size:8.5pt;">
+      <thead><tr><th>Party</th><th>Invested</th><th>Distributions</th><th>IRR</th><th>EM</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>LP</td>
+          <td>${{ "{:,.0f}".format(result.waterfall.lp_equity_invested) }}</td>
+          <td>${{ "{:,.0f}".format(result.waterfall.lp_total_distributions) }}</td>
+          <td>{{ "{:.1%}".format(result.waterfall.lp_irr) }}</td>
+          <td>{{ "{:.2f}x".format(result.waterfall.lp_equity_multiple) }}</td>
+        </tr>
+        <tr>
+          <td>GP</td>
+          <td>${{ "{:,.0f}".format(result.waterfall.gp_equity_invested) }}</td>
+          <td>${{ "{:,.0f}".format(result.waterfall.gp_total_distributions) }}</td>
+          <td>{{ "{:.1%}".format(result.waterfall.gp_irr) }}</td>
+          <td>{{ "{:.2f}x".format(result.waterfall.gp_equity_multiple) }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div>
+    {% for tier in result.waterfall.tiers %}
+    <div class="waterfall-tier">
+      <span class="waterfall-tier-name">{{ tier.tier_name }}</span>
+      <span class="waterfall-tier-lp">LP: ${{ "{:,.0f}".format(tier.lp_distributions) }}</span>
+      <span class="waterfall-tier-gp">GP: ${{ "{:,.0f}".format(tier.gp_distributions) }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- ══ DISCLAIMER ════════════════════════════════════════════════════ -->
+<div class="disclaimer">
+  <strong>IMPORTANT DISCLAIMER:</strong> This investment memorandum was prepared by PropAI for informational and discussion purposes only.
+  All projections, forecasts, and financial models are based on assumptions that may not materialize. Past performance is not indicative of future results.
+  This document does not constitute an offer to sell or a solicitation to buy any security. Prospective investors should conduct their own due diligence
+  and consult with qualified financial, legal, and tax advisors before making any investment decision.
+  Market data sourced from US Census Bureau, FRED, HUD, and Zillow Research. AI-generated narrative sections produced by Anthropic Claude.
+  <br/><br/>
+  <em>Generated by PropAI &mdash; open-source real estate investment intelligence &mdash; github.com/propai</em>
+</div>
+
+</body>
+</html>

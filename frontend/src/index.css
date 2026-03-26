@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --navy-950: #0a1929;
+    --navy-900: #102a43;
+    --navy-800: #243b53;
+    --navy-700: #334e68;
+    --gold-500: #e6b800;
+  }
+
+  html {
+    @apply antialiased;
+  }
+
+  body {
+    @apply bg-navy-950 text-slate-100 font-sans;
+  }
+
+  * {
+    @apply border-navy-800;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    @apply w-1.5 h-1.5;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-navy-900;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-navy-600 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-navy-500;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-navy-900 border border-navy-800 rounded-xl p-6;
+  }
+
+  .card-sm {
+    @apply bg-navy-900 border border-navy-800 rounded-lg p-4;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg
+           bg-gold-500 text-navy-950 font-semibold text-sm
+           hover:bg-gold-400 active:bg-gold-600
+           transition-colors duration-150
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg
+           bg-navy-800 text-slate-200 font-medium text-sm
+           hover:bg-navy-700 active:bg-navy-600
+           transition-colors duration-150
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 px-3 py-1.5 rounded-md
+           text-slate-400 text-sm font-medium
+           hover:bg-navy-800 hover:text-slate-200
+           transition-colors duration-150;
+  }
+
+  .input {
+    @apply w-full bg-navy-800 border border-navy-700 rounded-lg
+           px-3 py-2 text-sm text-slate-100
+           placeholder-slate-500
+           focus:outline-none focus:ring-2 focus:ring-gold-500/50 focus:border-gold-500/50
+           transition-colors duration-150;
+  }
+
+  .label {
+    @apply block text-xs font-medium text-slate-400 mb-1;
+  }
+
+  .badge-green {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+           bg-emerald-500/15 text-emerald-400 border border-emerald-500/20;
+  }
+
+  .badge-yellow {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+           bg-amber-500/15 text-amber-400 border border-amber-500/20;
+  }
+
+  .badge-red {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+           bg-red-500/15 text-red-400 border border-red-500/20;
+  }
+
+  .metric-value {
+    @apply text-2xl font-bold text-slate-100;
+  }
+
+  .metric-label {
+    @apply text-xs font-medium text-slate-500 uppercase tracking-wider;
+  }
+
+  .section-header {
+    @apply text-lg font-semibold text-slate-100 mb-4;
+  }
+
+  /* Sensitivity table heat colors */
+  .heat-hot { @apply bg-emerald-500/20 text-emerald-300; }
+  .heat-warm { @apply bg-emerald-500/10 text-emerald-400; }
+  .heat-neutral { @apply bg-amber-500/10 text-amber-400; }
+  .heat-cool { @apply bg-red-500/10 text-red-400; }
+  .heat-cold { @apply bg-red-500/20 text-red-300; }
+}

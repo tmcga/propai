@@ -1,0 +1,36 @@
+"""
+PropAI Financial Engine
+=======================
+Core underwriting, DCF, and returns analysis for real estate investment.
+Supports: SFR, Multifamily, Commercial, Industrial, STR, Ground-Up Development
+"""
+
+from .models import (
+    DealInput,
+    LoanInput,
+    OperatingAssumptions,
+    ExitAssumptions,
+    EquityStructure,
+    UnderwritingResult,
+    ProFormaYear,
+    ReturnMetrics,
+    SensitivityTable,
+)
+from .proforma import ProFormaEngine
+from .dcf import DCFEngine
+from .waterfall import WaterfallEngine
+
+__all__ = [
+    "DealInput",
+    "LoanInput",
+    "OperatingAssumptions",
+    "ExitAssumptions",
+    "EquityStructure",
+    "UnderwritingResult",
+    "ProFormaYear",
+    "ReturnMetrics",
+    "SensitivityTable",
+    "ProFormaEngine",
+    "DCFEngine",
+    "WaterfallEngine",
+]
