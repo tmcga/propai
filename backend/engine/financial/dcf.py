@@ -8,6 +8,7 @@ there is no dependency on numpy-financial (keeping the engine portable).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Optional
 
 
@@ -173,7 +174,7 @@ def average_cash_on_cash(
 
 
 def irr_sensitivity_table(
-    base_cash_flow_fn,  # callable(rent_growth, exit_cap) -> list[float]
+    base_cash_flow_fn: Callable[[float, float], list[float]],
     rent_growth_range: list[float],
     exit_cap_range: list[float],
 ) -> list[list[float]]:
@@ -206,7 +207,7 @@ def irr_sensitivity_table(
 
 
 def coc_sensitivity_table(
-    base_cash_flow_fn,  # callable(rent_growth, exit_cap) -> (btcf_yr1, equity)
+    base_cash_flow_fn: Callable[[float, float], tuple[float, float]],
     rent_growth_range: list[float],
     interest_rate_range: list[float],
 ) -> list[list[float]]:
@@ -303,7 +304,7 @@ class DCFEngine:
         operating_cfs = self.equity_cash_flows[1:-1]  # Exclude t=0 and final year
         return average_cash_on_cash(operating_cfs, equity_invested)
 
-    def summary(self) -> dict:
+    def summary(self) -> dict[str, object]:
         """Return all key DCF metrics as a dictionary."""
         l_irr = self.levered_irr
         ul_irr = self.unlevered_irr

@@ -187,7 +187,7 @@ class DealInput(BaseModel):
     )
 
     # Sub-models
-    loan: LoanInput = Field(default_factory=LoanInput)
+    loan: LoanInput = Field(default_factory=lambda: LoanInput())
     operations: OperatingAssumptions
     exit: ExitAssumptions
     equity_structure: Optional[EquityStructure] = Field(
