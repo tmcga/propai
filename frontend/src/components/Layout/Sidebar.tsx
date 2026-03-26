@@ -1,17 +1,11 @@
+import { BarChart3, Building2, Calculator, LayoutDashboard, Map as MapIcon } from "lucide-react";
 import { NavLink } from "react-router-dom";
-import {
-  Calculator,
-  BarChart3,
-  Map,
-  LayoutDashboard,
-  Building2,
-} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const nav = [
   { to: "/underwrite", icon: Calculator, label: "Underwrite" },
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/market", icon: Map, label: "Market Intel" },
+  { to: "/market", icon: MapIcon, label: "Market Intel" },
 ];
 
 export default function Sidebar() {
@@ -38,7 +32,7 @@ export default function Sidebar() {
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                 isActive
                   ? "bg-gold-500/10 text-gold-500"
-                  : "text-slate-400 hover:bg-navy-800 hover:text-slate-200"
+                  : "text-slate-400 hover:bg-navy-800 hover:text-slate-200",
               )
             }
           >

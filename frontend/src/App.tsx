@@ -1,10 +1,10 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "@/components/Layout/Layout";
-import UnderwritePage from "@/pages/UnderwritePage";
-import ResultsPage from "@/pages/ResultsPage";
+import DashboardPage from "@/pages/DashboardPage";
 import MarketPage from "@/pages/MarketPage";
 import MemoPage from "@/pages/MemoPage";
-import DashboardPage from "@/pages/DashboardPage";
+import ResultsPage from "@/pages/ResultsPage";
+import UnderwritePage from "@/pages/UnderwritePage";
 
 export default function App() {
   return (

@@ -1,5 +1,5 @@
+import { ExternalLink, Github } from "lucide-react";
 import { useLocation } from "react-router-dom";
-import { Github, ExternalLink } from "lucide-react";
 
 const PAGE_TITLES: Record<string, string> = {
   "/underwrite": "Deal Underwriting",
@@ -12,8 +12,11 @@ export default function Topbar() {
 
   const title =
     PAGE_TITLES[pathname] ??
-    (pathname.startsWith("/results") ? "Underwriting Results" :
-     pathname.startsWith("/memo") ? "Investment Memo" : "PropAI");
+    (pathname.startsWith("/results")
+      ? "Underwriting Results"
+      : pathname.startsWith("/memo")
+        ? "Investment Memo"
+        : "PropAI");
 
   return (
     <header className="h-14 flex items-center justify-between px-6 border-b border-navy-800 bg-navy-900 shrink-0">

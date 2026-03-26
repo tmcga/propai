@@ -1,10 +1,10 @@
 import axios from "axios";
 import type {
   DealInput,
-  UnderwritingResult,
-  MarketReport,
   InvestmentMemo,
+  MarketReport,
   ParseResult,
+  UnderwritingResult,
 } from "@/types";
 
 const api = axios.create({
@@ -16,10 +16,9 @@ const api = axios.create({
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    const message =
-      err.response?.data?.detail ?? err.message ?? "An unexpected error occurred";
+    const message = err.response?.data?.detail ?? err.message ?? "An unexpected error occurred";
     return Promise.reject(new Error(message));
-  }
+  },
 );
 
 // ── Underwriting ───────────────────────────────────────────────────────────
@@ -37,7 +36,7 @@ export const getSampleResult = (): Promise<UnderwritingResult> =>
 
 export const getMetroMarket = (
   metro: string,
-  params?: { state_fips?: string; county_fips?: string }
+  params?: { state_fips?: string; county_fips?: string },
 ): Promise<MarketReport> =>
   api
     .get<MarketReport>(`/market/metro/${encodeURIComponent(metro)}`, { params })
@@ -54,12 +53,13 @@ export const getSampleMarket = (): Promise<MarketReport> =>
 
 // ── AI ─────────────────────────────────────────────────────────────────────
 
-export const analyzeDeal = (text: string): Promise<{
+export const analyzeDeal = (
+  text: string,
+): Promise<{
   deal_input: DealInput;
   underwriting: UnderwritingResult;
   memo: InvestmentMemo;
-}> =>
-  api.post("/ai/analyze", { text }).then((r) => r.data);
+}> => api.post("/ai/analyze", { text }).then((r) => r.data);
 
 export const parseDeal = (text: string): Promise<ParseResult> =>
   api.post<ParseResult>("/ai/parse", { text }).then((r) => r.data);
