@@ -92,7 +92,28 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("API key authentication DISABLED (set PROPAI_API_KEYS to enable)")
     logger.info("PropAI starting up (env=%s)...", ENV)
+
+    # Initialize database (create tables in dev, skip if DB not available)
+    try:
+        from db.session import init_db
+        init_db()
+        from db.session import engine as db_engine
+        from db.base import Base
+        async with db_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database tables initialized")
+    except Exception as e:
+        logger.warning("Database not available (deals API will be unavailable): %s", e)
+
     yield
+
+    # Dispose database engine
+    try:
+        from db.session import engine as db_engine
+        if db_engine:
+            await db_engine.dispose()
+    except Exception:
+        pass
     logger.info("PropAI shutting down.")
 
 
@@ -159,11 +180,13 @@ from api.underwriting import router as underwriting_router
 from api.market import router as market_router
 from api.ai import router as ai_router
 from api.analysis import router as analysis_router
+from api.deals import router as deals_router
 
 app.include_router(underwriting_router)
 app.include_router(market_router)
 app.include_router(ai_router)
 app.include_router(analysis_router)
+app.include_router(deals_router)
 
 # ---------------------------------------------------------------------------
 # Root

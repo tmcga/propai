@@ -174,6 +174,21 @@ class DocumentParser:
     def __init__(self) -> None:
         self.client = AsyncAnthropic()
 
+    async def parse_bytes(self, content: bytes, doc_type_hint: str = "auto") -> ParsedDocument:
+        """Parse raw bytes (PDF or text). Handles PDF extraction automatically."""
+        try:
+            text = content.decode("utf-8")
+            return await self.parse_text(clean_text(text), doc_type_hint)
+        except UnicodeDecodeError:
+            import tempfile, os
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                tmp.write(content)
+                tmp_path = tmp.name
+            try:
+                return await self.parse_file(tmp_path, doc_type_hint)
+            finally:
+                os.unlink(tmp_path)
+
     async def parse_file(self, path: str | Path, doc_type_hint: str = "auto") -> ParsedDocument:
         """Parse a document file (PDF or txt)."""
         path = Path(path)

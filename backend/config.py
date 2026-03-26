@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     # AI / LLM
     anthropic_api_key: str = Field("", alias="ANTHROPIC_API_KEY")
 
+    # File storage
+    storage_backend: str = Field("local", alias="STORAGE_BACKEND")
+    storage_local_path: str = Field("./uploads", alias="STORAGE_LOCAL_PATH")
+
     # Data APIs (all optional)
     census_api_key: str = Field("", alias="CENSUS_API_KEY")
     fred_api_key: str = Field("", alias="FRED_API_KEY")
