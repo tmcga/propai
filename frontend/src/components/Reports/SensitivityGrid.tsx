@@ -1,5 +1,5 @@
+import { cocHeatClass, fmt, irrHeatClass } from "@/lib/utils";
 import type { SensitivityTable } from "@/types";
-import { fmt, irrHeatClass, cocHeatClass } from "@/lib/utils";
 
 interface Props {
   table: SensitivityTable;
@@ -32,9 +32,7 @@ export default function SensitivityGrid({ table }: Props) {
         <tbody>
           {row_values.map((rv, ri) => (
             <tr key={rv}>
-              <td className="py-1.5 pr-3 text-slate-400 font-medium">
-                {fmt(rv, "percent", 2)}
-              </td>
+              <td className="py-1.5 pr-3 text-slate-400 font-medium">{fmt(rv, "percent", 2)}</td>
               {col_values.map((_cv, ci) => {
                 const val = data[ri][ci];
                 return (

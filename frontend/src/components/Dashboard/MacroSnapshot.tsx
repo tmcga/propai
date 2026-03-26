@@ -1,5 +1,5 @@
-import type { MacroSnapshot as MacroSnapshotType } from "@/types";
 import { fmt } from "@/lib/utils";
+import type { MacroSnapshot as MacroSnapshotType } from "@/types";
 
 interface Props {
   macro: MacroSnapshotType;

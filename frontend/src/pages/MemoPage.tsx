@@ -1,9 +1,9 @@
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { ArrowLeft, Download, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Download, RefreshCw, Sparkles, Loader2 } from "lucide-react";
-import { getDemoMemo, generateMemo } from "@/lib/api";
-import type { InvestmentMemo, DealInput, UnderwritingResult } from "@/types";
+import { Link, useParams } from "react-router-dom";
+import { generateMemo, getDemoMemo } from "@/lib/api";
+import type { DealInput, InvestmentMemo, UnderwritingResult } from "@/types";
 
 export default function MemoPage() {
   const { dealId } = useParams();
@@ -50,9 +50,7 @@ export default function MemoPage() {
           </Link>
           <div>
             <h1 className="text-xl font-bold text-slate-100">Investment Memo</h1>
-            {memo && (
-              <p className="text-sm text-slate-400">{memo.deal_name}</p>
-            )}
+            {memo && <p className="text-sm text-slate-400">{memo.deal_name}</p>}
           </div>
         </div>
 
@@ -118,9 +116,7 @@ export default function MemoPage() {
               .filter(([, v]) => Boolean(v))
               .map(([key, content]) => (
                 <div key={key} className="card">
-                  <h3 className="section-header capitalize">
-                    {key.replace(/_/g, " ")}
-                  </h3>
+                  <h3 className="section-header capitalize">{key.replace(/_/g, " ")}</h3>
                   <div className="prose prose-invert prose-sm max-w-none text-slate-300 leading-relaxed whitespace-pre-wrap">
                     {content}
                   </div>
@@ -133,12 +129,10 @@ export default function MemoPage() {
       {!isLoading && !memo && (
         <div className="card text-center py-16">
           <Sparkles className="w-8 h-8 text-gold-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-slate-200 mb-2">
-            Ready to generate your memo
-          </h3>
+          <h3 className="text-lg font-semibold text-slate-200 mb-2">Ready to generate your memo</h3>
           <p className="text-sm text-slate-400 mb-6 max-w-sm mx-auto">
-            PropAI will write a 9-section institutional investment memo using your
-            underwriting data and market intelligence.
+            PropAI will write a 9-section institutional investment memo using your underwriting data
+            and market intelligence.
           </p>
           <p className="text-xs text-slate-600">
             Requires <code className="text-slate-400">ANTHROPIC_API_KEY</code> to be set.
