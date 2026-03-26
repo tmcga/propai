@@ -378,13 +378,3 @@ PropAI is for informational and educational purposes only. Nothing in this softw
 ## License
 
 MIT — see [LICENSE](LICENSE). Use it, fork it, build on it.
-
----
-
-<div align="center">
-
-Built with ☕ and Python by [Tom McGahan](https://github.com/tmcgahan94) and contributors.
-
-If PropAI saved you time or helped you close a deal, consider starring the repo ⭐
-
-</div>
