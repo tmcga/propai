@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
+import { ArrowRight, Calculator, FileText, Github, Map as MapIcon } from "lucide-react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Calculator, Map, FileText, Github } from "lucide-react";
-import { getSampleResult } from "@/lib/api";
 import MetricsBar from "@/components/Dashboard/MetricsBar";
+import { getSampleResult } from "@/lib/api";
 
 export default function DashboardPage() {
   const { data: sample } = useQuery({
@@ -17,14 +17,12 @@ export default function DashboardPage() {
         <div className="flex items-start justify-between">
           <div className="space-y-2 max-w-2xl">
             <h2 className="text-2xl font-bold text-slate-100">
-              Real estate underwriting,{" "}
-              <span className="text-gold-500">reimagined.</span>
+              Real estate underwriting, <span className="text-gold-500">reimagined.</span>
             </h2>
             <p className="text-slate-400 leading-relaxed">
-              PropAI replaces spreadsheets and $5k/year SaaS tools with an
-              open-source, AI-native workflow. Describe a deal in plain English.
-              Get a full pro forma, IRR analysis, market intelligence, and
-              institutional memo — in under 60 seconds.
+              PropAI replaces spreadsheets and $5k/year SaaS tools with an open-source, AI-native
+              workflow. Describe a deal in plain English. Get a full pro forma, IRR analysis, market
+              intelligence, and institutional memo — in under 60 seconds.
             </p>
             <div className="flex flex-wrap gap-3 pt-2">
               <Link to="/underwrite" className="btn-primary">
@@ -32,7 +30,7 @@ export default function DashboardPage() {
                 Underwrite a Deal
               </Link>
               <Link to="/market" className="btn-secondary">
-                <Map className="w-4 h-4" />
+                <MapIcon className="w-4 h-4" />
                 Market Research
               </Link>
               <Link to="/memo/sample" className="btn-secondary">
@@ -99,7 +97,8 @@ export default function DashboardPage() {
             <div>
               <h3 className="section-header mb-0">Sample Deal — {sample.deal.name}</h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                {sample.deal.market} · {sample.deal.units} units · ${(sample.deal.purchase_price / 1_000_000).toFixed(1)}M
+                {sample.deal.market} · {sample.deal.units} units · $
+                {(sample.deal.purchase_price / 1_000_000).toFixed(1)}M
               </p>
             </div>
             <Link to="/results/sample" className="btn-ghost text-xs">

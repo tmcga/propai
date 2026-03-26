@@ -1,29 +1,39 @@
 import {
-  ComposedChart,
   Bar,
+  CartesianGrid,
+  ComposedChart,
+  Legend,
   Line,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
 } from "recharts";
-import type { ProFormaYear } from "@/types";
 import { fmt } from "@/lib/utils";
+import type { ProFormaYear } from "@/types";
 
 interface Props {
   data: ProFormaYear[];
 }
 
-const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; color: string; value: number }>; label?: string }) => {
+const CustomTooltip = ({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{ name: string; color: string; value: number }>;
+  label?: string;
+}) => {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-navy-800 border border-navy-700 rounded-lg p-3 text-xs space-y-1 shadow-xl">
       <p className="font-semibold text-slate-200 mb-2">Year {label}</p>
       {payload.map((p) => (
         <div key={p.name} className="flex items-center justify-between gap-6">
-          <span style={{ color: p.color }} className="text-slate-300">{p.name}</span>
+          <span style={{ color: p.color }} className="text-slate-300">
+            {p.name}
+          </span>
           <span className="font-mono font-semibold" style={{ color: p.color }}>
             {fmt(p.value, "currency")}
           </span>
@@ -60,10 +70,7 @@ export default function CashFlowChart({ data }: Props) {
           width={70}
         />
         <Tooltip content={<CustomTooltip />} />
-        <Legend
-          wrapperStyle={{ fontSize: 11, color: "#829ab1" }}
-          iconSize={8}
-        />
+        <Legend wrapperStyle={{ fontSize: 11, color: "#829ab1" }} iconSize={8} />
         <Bar dataKey="NOI" fill="#10b981" fillOpacity={0.6} radius={[3, 3, 0, 0]} />
         <Bar dataKey="Debt Service" fill="#334e68" fillOpacity={0.8} radius={[3, 3, 0, 0]} />
         <Line

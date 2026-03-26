@@ -1,11 +1,11 @@
+import { useMutation } from "@tanstack/react-query";
+import { AlertCircle, ArrowRight, Loader2, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useMutation } from "@tanstack/react-query";
-import { Sparkles, ArrowRight, Loader2, AlertCircle } from "lucide-react";
-import { analyzeDeal, underwrite } from "@/lib/api";
-import type { DealInput } from "@/types";
 import DealForm from "@/components/Underwriting/DealForm";
+import { analyzeDeal, underwrite } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import type { DealInput } from "@/types";
 
 export default function UnderwritePage() {
   const navigate = useNavigate();
@@ -44,7 +44,7 @@ export default function UnderwritePage() {
             "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
             mode === "ai"
               ? "bg-gold-500/10 text-gold-500 border border-gold-500/30"
-              : "text-slate-400 hover:text-slate-200 hover:bg-navy-800"
+              : "text-slate-400 hover:text-slate-200 hover:bg-navy-800",
           )}
         >
           <span className="flex items-center gap-1.5">
@@ -58,7 +58,7 @@ export default function UnderwritePage() {
             "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
             mode === "manual"
               ? "bg-gold-500/10 text-gold-500 border border-gold-500/30"
-              : "text-slate-400 hover:text-slate-200 hover:bg-navy-800"
+              : "text-slate-400 hover:text-slate-200 hover:bg-navy-800",
           )}
         >
           Manual Entry
@@ -68,12 +68,10 @@ export default function UnderwritePage() {
       {mode === "ai" ? (
         <div className="card space-y-4">
           <div>
-            <h2 className="text-lg font-semibold text-slate-100 mb-1">
-              Describe your deal
-            </h2>
+            <h2 className="text-lg font-semibold text-slate-100 mb-1">Describe your deal</h2>
             <p className="text-sm text-slate-400">
-              Describe the property in plain English. PropAI will extract the deal
-              structure and run a full underwriting.
+              Describe the property in plain English. PropAI will extract the deal structure and run
+              a full underwriting.
             </p>
           </div>
 

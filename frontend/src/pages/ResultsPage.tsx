@@ -1,14 +1,14 @@
-import { useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { FileText, RefreshCw, ArrowLeft } from "lucide-react";
-import { getSampleResult } from "@/lib/api";
-import type { UnderwritingResult } from "@/types";
+import { ArrowLeft, FileText, RefreshCw } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import CashFlowChart from "@/components/Charts/CashFlowChart";
 import MetricsBar from "@/components/Dashboard/MetricsBar";
+import WarningBanner from "@/components/Dashboard/WarningBanner";
 import ProFormaTable from "@/components/Reports/ProFormaTable";
 import SensitivityGrid from "@/components/Reports/SensitivityGrid";
-import WarningBanner from "@/components/Dashboard/WarningBanner";
-import CashFlowChart from "@/components/Charts/CashFlowChart";
+import { getSampleResult } from "@/lib/api";
+import type { UnderwritingResult } from "@/types";
 
 export default function ResultsPage() {
   const { dealId } = useParams();
@@ -63,7 +63,11 @@ export default function ResultsPage() {
             <h1 className="text-xl font-bold text-slate-100">{deal.name}</h1>
             <p className="text-sm text-slate-400">
               {deal.market} · {deal.asset_class.replace("_", " ")} ·{" "}
-              {deal.units ? `${deal.units} units` : deal.square_feet ? `${deal.square_feet.toLocaleString()} SF` : ""}
+              {deal.units
+                ? `${deal.units} units`
+                : deal.square_feet
+                  ? `${deal.square_feet.toLocaleString()} SF`
+                  : ""}
             </p>
           </div>
         </div>
@@ -74,9 +78,7 @@ export default function ResultsPage() {
       </div>
 
       {/* Warnings */}
-      {warnings && warnings.length > 0 && (
-        <WarningBanner warnings={warnings} />
-      )}
+      {warnings && warnings.length > 0 && <WarningBanner warnings={warnings} />}
 
       {/* Key Metrics */}
       <MetricsBar metrics={metrics} />

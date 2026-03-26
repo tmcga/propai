@@ -1,9 +1,9 @@
-import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Search, Loader2, TrendingUp, TrendingDown, AlertCircle } from "lucide-react";
+import { AlertCircle, Loader2, Search, TrendingDown, TrendingUp } from "lucide-react";
+import { useState } from "react";
+import MacroSnapshot from "@/components/Dashboard/MacroSnapshot";
 import { getMetroMarket, getZipMarket } from "@/lib/api";
 import { fmt, gradeColor } from "@/lib/utils";
-import MacroSnapshot from "@/components/Dashboard/MacroSnapshot";
 
 export default function MarketPage() {
   const [query, setQuery] = useState("");
@@ -11,9 +11,7 @@ export default function MarketPage() {
 
   const mutation = useMutation({
     mutationFn: () =>
-      queryType === "zip"
-        ? getZipMarket(query.trim())
-        : getMetroMarket(query.trim()),
+      queryType === "zip" ? getZipMarket(query.trim()) : getMetroMarket(query.trim()),
   });
 
   const report = mutation.data;
@@ -25,8 +23,8 @@ export default function MarketPage() {
         <div>
           <h2 className="text-lg font-semibold text-slate-100 mb-1">Market Intelligence</h2>
           <p className="text-sm text-slate-400">
-            Pull demographics, macroeconomic data, HUD fair market rents, and Zillow trends
-            for any US market.
+            Pull demographics, macroeconomic data, HUD fair market rents, and Zillow trends for any
+            US market.
           </p>
         </div>
 
@@ -155,12 +153,30 @@ export default function MarketPage() {
               <h3 className="section-header">Demographics</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {[
-                  { label: "Population", value: report.demographics.total_population?.toLocaleString() },
-                  { label: "Median HH Income", value: fmt(report.demographics.median_household_income, "currency") },
-                  { label: "Median Gross Rent", value: fmt(report.demographics.median_gross_rent, "currency") },
-                  { label: "Vacancy Rate", value: fmt(report.demographics.vacancy_rate, "percent") },
-                  { label: "Homeownership Rate", value: fmt(report.demographics.homeownership_rate, "percent") },
-                  { label: "Rent-to-Income Ratio", value: fmt(report.demographics.rent_to_income_ratio, "percent") },
+                  {
+                    label: "Population",
+                    value: report.demographics.total_population?.toLocaleString(),
+                  },
+                  {
+                    label: "Median HH Income",
+                    value: fmt(report.demographics.median_household_income, "currency"),
+                  },
+                  {
+                    label: "Median Gross Rent",
+                    value: fmt(report.demographics.median_gross_rent, "currency"),
+                  },
+                  {
+                    label: "Vacancy Rate",
+                    value: fmt(report.demographics.vacancy_rate, "percent"),
+                  },
+                  {
+                    label: "Homeownership Rate",
+                    value: fmt(report.demographics.homeownership_rate, "percent"),
+                  },
+                  {
+                    label: "Rent-to-Income Ratio",
+                    value: fmt(report.demographics.rent_to_income_ratio, "percent"),
+                  },
                 ].map(({ label, value }) => (
                   <div key={label} className="card-sm">
                     <span className="metric-label">{label}</span>

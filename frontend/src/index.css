@@ -110,9 +110,19 @@
   }
 
   /* Sensitivity table heat colors */
-  .heat-hot { @apply bg-emerald-500/20 text-emerald-300; }
-  .heat-warm { @apply bg-emerald-500/10 text-emerald-400; }
-  .heat-neutral { @apply bg-amber-500/10 text-amber-400; }
-  .heat-cool { @apply bg-red-500/10 text-red-400; }
-  .heat-cold { @apply bg-red-500/20 text-red-300; }
+  .heat-hot {
+    @apply bg-emerald-500/20 text-emerald-300;
+  }
+  .heat-warm {
+    @apply bg-emerald-500/10 text-emerald-400;
+  }
+  .heat-neutral {
+    @apply bg-amber-500/10 text-amber-400;
+  }
+  .heat-cool {
+    @apply bg-red-500/10 text-red-400;
+  }
+  .heat-cold {
+    @apply bg-red-500/20 text-red-300;
+  }
 }

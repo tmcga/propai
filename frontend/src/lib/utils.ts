@@ -1,11 +1,15 @@
-import { clsx, type ClassValue } from "clsx";
+import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function fmt(value: number, style: "currency" | "percent" | "number" | "multiple", decimals = 2): string {
+export function fmt(
+  value: number,
+  style: "currency" | "percent" | "number" | "multiple",
+  decimals = 2,
+): string {
   if (!Number.isFinite(value)) return "—";
 
   switch (style) {
@@ -36,15 +40,15 @@ export function fmt(value: number, style: "currency" | "percent" | "number" | "m
 }
 
 export function irrHeatClass(irr: number): string {
-  if (irr >= 0.20) return "heat-hot";
+  if (irr >= 0.2) return "heat-hot";
   if (irr >= 0.15) return "heat-warm";
-  if (irr >= 0.10) return "heat-neutral";
+  if (irr >= 0.1) return "heat-neutral";
   if (irr >= 0.05) return "heat-cool";
   return "heat-cold";
 }
 
 export function cocHeatClass(coc: number): string {
-  if (coc >= 0.10) return "heat-hot";
+  if (coc >= 0.1) return "heat-hot";
   if (coc >= 0.07) return "heat-warm";
   if (coc >= 0.05) return "heat-neutral";
   if (coc >= 0.03) return "heat-cool";
