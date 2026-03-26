@@ -7,13 +7,11 @@ No side effects, fully testable, no dependencies on other engine modules.
 
 from __future__ import annotations
 
-import math
-from typing import Optional
-
 
 # ---------------------------------------------------------------------------
 # Income & Expense
 # ---------------------------------------------------------------------------
+
 
 def effective_gross_income(
     gross_scheduled_income: float,
@@ -74,6 +72,7 @@ def net_operating_income(
 # Capitalization & Valuation
 # ---------------------------------------------------------------------------
 
+
 def cap_rate(noi: float, value: float) -> float:
     """
     Cap Rate = NOI / Value
@@ -127,6 +126,7 @@ def price_per_sf(purchase_price: float, square_feet: float) -> float:
 # Debt & Coverage
 # ---------------------------------------------------------------------------
 
+
 def annual_debt_service(
     loan_amount: float,
     interest_rate: float,
@@ -167,11 +167,13 @@ def annual_debt_service(
         # Fully amortizing from start — balance depends on years elapsed
         elapsed_amort_years = current_year - 1
         if monthly_rate > 0:
-            remaining_balance = loan_amount * (
-                (1 + monthly_rate) ** (amortization_years * 12)
-                - (1 + monthly_rate) ** (elapsed_amort_years * 12)
-            ) / (
-                (1 + monthly_rate) ** (amortization_years * 12) - 1
+            remaining_balance = (
+                loan_amount
+                * (
+                    (1 + monthly_rate) ** (amortization_years * 12)
+                    - (1 + monthly_rate) ** (elapsed_amort_years * 12)
+                )
+                / ((1 + monthly_rate) ** (amortization_years * 12) - 1)
             )
         else:
             remaining_balance = loan_amount * (
@@ -182,10 +184,10 @@ def annual_debt_service(
     # Monthly P&I payment on remaining balance over remaining amort schedule
     months_remaining = years_remaining * 12
     if monthly_rate > 0:
-        monthly_payment = remaining_balance * (
-            monthly_rate * (1 + monthly_rate) ** months_remaining
-        ) / (
-            (1 + monthly_rate) ** months_remaining - 1
+        monthly_payment = (
+            remaining_balance
+            * (monthly_rate * (1 + monthly_rate) ** months_remaining)
+            / ((1 + monthly_rate) ** months_remaining - 1)
         )
     else:
         monthly_payment = remaining_balance / months_remaining
@@ -218,11 +220,10 @@ def loan_balance(
     n_elapsed = amort_years_elapsed * 12
 
     if monthly_rate > 0:
-        balance = loan_amount * (
-            (1 + monthly_rate) ** n_total
-            - (1 + monthly_rate) ** n_elapsed
-        ) / (
-            (1 + monthly_rate) ** n_total - 1
+        balance = (
+            loan_amount
+            * ((1 + monthly_rate) ** n_total - (1 + monthly_rate) ** n_elapsed)
+            / ((1 + monthly_rate) ** n_total - 1)
         )
     else:
         balance = loan_amount * (1 - amort_years_elapsed / amortization_years)
@@ -245,6 +246,7 @@ def debt_service_coverage_ratio(noi: float, annual_debt_service_: float) -> floa
 # ---------------------------------------------------------------------------
 # Cash Flow & Returns
 # ---------------------------------------------------------------------------
+
 
 def before_tax_cash_flow(noi: float, debt_service: float) -> float:
     """BTCF = NOI - Debt Service (levered operating cash flow)."""
@@ -293,6 +295,7 @@ def break_even_occupancy(
 # Exit / Disposition
 # ---------------------------------------------------------------------------
 
+
 def exit_price(exit_noi: float, exit_cap_rate_: float) -> float:
     """Reversion value = exit year NOI / exit cap rate."""
     return value_from_cap_rate(exit_noi, exit_cap_rate_)
@@ -315,6 +318,7 @@ def net_sale_proceeds(
 # ---------------------------------------------------------------------------
 # Quick Sanity Checks / Flags
 # ---------------------------------------------------------------------------
+
 
 def generate_warnings(
     going_in_cap: float,

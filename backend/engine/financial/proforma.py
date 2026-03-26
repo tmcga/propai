@@ -10,7 +10,6 @@ Takes a DealInput and produces a complete UnderwritingResult including:
 
 from __future__ import annotations
 
-from typing import Optional
 
 from .models import (
     DealInput,
@@ -22,7 +21,6 @@ from .models import (
 )
 from .metrics import (
     effective_gross_income,
-    net_operating_income,
     annual_debt_service,
     loan_balance,
     cap_rate,
@@ -108,7 +106,10 @@ class ProFormaEngine:
         )
 
         equity_cfs.append(final_year.before_tax_cash_flow + net_proceeds)
-        asset_cfs.append(final_year.net_operating_income + gross_exit_price * (1 - exit_.selling_costs_pct))
+        asset_cfs.append(
+            final_year.net_operating_income
+            + gross_exit_price * (1 - exit_.selling_costs_pct)
+        )
 
         self._equity_cfs = equity_cfs
         self._asset_cfs = asset_cfs
@@ -120,22 +121,31 @@ class ProFormaEngine:
         yr1 = pro_forma[0]
         io_years = loan.io_period_years if loan.loan_type != LoanType.FIXED else 0
         yr1_ds, _, _ = annual_debt_service(
-            loan_amount, loan.interest_rate, loan.amortization_years,
-            io_years=io_years, current_year=1
+            loan_amount,
+            loan.interest_rate,
+            loan.amortization_years,
+            io_years=io_years,
+            current_year=1,
         )
 
         going_in_cap = cap_rate(yr1.net_operating_income, deal.purchase_price)
         dscr_yr1 = debt_service_coverage_ratio(yr1.net_operating_income, yr1_ds)
         coc_yr1 = cash_on_cash_return(yr1.before_tax_cash_flow, equity_invested)
         grm = gross_rent_multiplier(deal.purchase_price, ops.gross_scheduled_income)
-        oer = operating_expense_ratio(yr1.total_operating_expenses, yr1.effective_gross_income)
+        oer = operating_expense_ratio(
+            yr1.total_operating_expenses, yr1.effective_gross_income
+        )
         beo = break_even_occupancy(
             yr1.total_operating_expenses, yr1_ds, ops.gross_scheduled_income
         )
 
         # ── 6. Per-unit / per-SF metrics ──────────────────────────────
         ppu = price_per_unit(deal.purchase_price, deal.units) if deal.units else None
-        ppsf = price_per_sf(deal.purchase_price, deal.square_feet) if deal.square_feet else None
+        ppsf = (
+            price_per_sf(deal.purchase_price, deal.square_feet)
+            if deal.square_feet
+            else None
+        )
         noi_unit = yr1.net_operating_income / deal.units if deal.units else None
 
         # ── 7. Return metrics ─────────────────────────────────────────
@@ -274,9 +284,18 @@ class ProFormaEngine:
             # ── Marked-to-Market Equity Value ─────────────────────────
             # Use going-in cap rate as current cap rate for simplicity
             # In a more advanced version, this could use a time-varying cap rate
-            implied_value = value_from_cap_rate(
-                noi, cap_rate(ops.gross_scheduled_income * (1 - ops.vacancy_rate) - total_opex, deal.purchase_price)
-            ) if deal.purchase_price > 0 else deal.purchase_price
+            implied_value = (
+                value_from_cap_rate(
+                    noi,
+                    cap_rate(
+                        ops.gross_scheduled_income * (1 - ops.vacancy_rate)
+                        - total_opex,
+                        deal.purchase_price,
+                    ),
+                )
+                if deal.purchase_price > 0
+                else deal.purchase_price
+            )
             equity_value = implied_value - current_loan_balance
 
             row = ProFormaYear(
@@ -302,18 +321,20 @@ class ProFormaEngine:
                 loan_balance=round(current_loan_balance, 2),
                 equity_value=round(equity_value, 2),
                 noi_per_unit=round(noi / deal.units, 2) if deal.units else None,
-                noi_per_sf=round(noi / deal.square_feet, 2) if deal.square_feet else None,
+                noi_per_sf=round(noi / deal.square_feet, 2)
+                if deal.square_feet
+                else None,
             )
             rows.append(row)
 
             # ── Grow inputs for next year ─────────────────────────────
-            current_gsi *= (1 + ops.rent_growth_rate)
-            current_taxes *= (1 + ops.expense_growth_rate)
-            current_insurance *= (1 + ops.expense_growth_rate)
-            current_maintenance *= (1 + ops.expense_growth_rate)
-            current_capex *= (1 + ops.expense_growth_rate)
-            current_utilities *= (1 + ops.expense_growth_rate)
-            current_other_exp *= (1 + ops.expense_growth_rate)
+            current_gsi *= 1 + ops.rent_growth_rate
+            current_taxes *= 1 + ops.expense_growth_rate
+            current_insurance *= 1 + ops.expense_growth_rate
+            current_maintenance *= 1 + ops.expense_growth_rate
+            current_capex *= 1 + ops.expense_growth_rate
+            current_utilities *= 1 + ops.expense_growth_rate
+            current_other_exp *= 1 + ops.expense_growth_rate
 
         return rows
 
@@ -347,8 +368,6 @@ class ProFormaEngine:
 
         def cash_flow_fn(rent_growth: float, exit_cap: float) -> list[float]:
             """Build equity cash flows for a given rent_growth and exit_cap."""
-            from .models import OperatingAssumptions, ExitAssumptions
-            import copy
 
             # Temporarily override growth and exit cap
             modified_deal = deal.model_copy(deep=True)
@@ -366,10 +385,15 @@ class ProFormaEngine:
             final_noi = pf[-1].net_operating_income
             gross_price = value_from_cap_rate(final_noi, exit_cap)
             final_balance = loan_balance(
-                loan_amount, loan.interest_rate, loan.amortization_years,
-                years_elapsed=exit_.hold_period_years, io_years=io_years,
+                loan_amount,
+                loan.interest_rate,
+                loan.amortization_years,
+                years_elapsed=exit_.hold_period_years,
+                io_years=io_years,
             )
-            net_proc = net_sale_proceeds(gross_price, final_balance, exit_.selling_costs_pct)
+            net_proc = net_sale_proceeds(
+                gross_price, final_balance, exit_.selling_costs_pct
+            )
             cfs.append(pf[-1].before_tax_cash_flow + net_proc)
             return cfs
 
@@ -419,14 +443,21 @@ class ProFormaEngine:
                     )
                     mgmt = egi * ops.management_fee_pct
                     total_opex = (
-                        ops.property_taxes + ops.insurance + mgmt
-                        + ops.maintenance_reserves + ops.capex_reserves
-                        + ops.utilities + ops.other_expenses
+                        ops.property_taxes
+                        + ops.insurance
+                        + mgmt
+                        + ops.maintenance_reserves
+                        + ops.capex_reserves
+                        + ops.utilities
+                        + ops.other_expenses
                     )
                     noi = egi - total_opex
                     ds, _, _ = annual_debt_service(
-                        loan_amount, interest_rate, loan.amortization_years,
-                        io_years=io_years, current_year=1
+                        loan_amount,
+                        interest_rate,
+                        loan.amortization_years,
+                        io_years=io_years,
+                        current_year=1,
                     )
                     btcf = before_tax_cash_flow(noi, ds)
                     coc = btcf / equity_invested if equity_invested > 0 else 0.0

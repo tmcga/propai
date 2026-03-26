@@ -3,7 +3,6 @@ import {
   Calculator,
   BarChart3,
   Map,
-  FileText,
   LayoutDashboard,
   Building2,
 } from "lucide-react";

@@ -41,6 +41,7 @@ router = APIRouter(prefix="/api/deals", tags=["deals"])
 # Result type enum (avoids scattered string literals)
 # ---------------------------------------------------------------------------
 
+
 class ResultType(str, enum.Enum):
     UNDERWRITING = "underwriting"
     MEMO = "memo"
@@ -51,6 +52,7 @@ class ResultType(str, enum.Enum):
 # ---------------------------------------------------------------------------
 # Request / Response schemas
 # ---------------------------------------------------------------------------
+
 
 class DealCreateStructured(BaseModel):
     mode: Literal["structured"]
@@ -123,6 +125,7 @@ class PortfolioCreate(BaseModel):
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _sync_deal_from_input(deal: Deal, deal_input: DealInput) -> None:
     """Keep deal metadata in sync with the latest DealInput."""
     deal.purchase_price = deal_input.purchase_price
@@ -137,9 +140,7 @@ def _sync_deal_from_input(deal: Deal, deal_input: DealInput) -> None:
 
 
 async def _get_deal_or_404(db: AsyncSession, deal_id: str) -> Deal:
-    stmt = select(Deal).where(
-        Deal.id == uuid.UUID(deal_id), Deal.deleted_at.is_(None)
-    )
+    stmt = select(Deal).where(Deal.id == uuid.UUID(deal_id), Deal.deleted_at.is_(None))
     result = await db.execute(stmt)
     deal = result.scalar_one_or_none()
     if not deal:
@@ -147,7 +148,9 @@ async def _get_deal_or_404(db: AsyncSession, deal_id: str) -> Deal:
     return deal
 
 
-async def _get_primary_version(db: AsyncSession, deal_id: uuid.UUID) -> DealVersion | None:
+async def _get_primary_version(
+    db: AsyncSession, deal_id: uuid.UUID
+) -> DealVersion | None:
     stmt = select(DealVersion).where(
         DealVersion.deal_id == deal_id, DealVersion.is_primary.is_(True)
     )
@@ -156,9 +159,8 @@ async def _get_primary_version(db: AsyncSession, deal_id: uuid.UUID) -> DealVers
 
 
 async def _next_version_number(db: AsyncSession, deal_id: uuid.UUID) -> int:
-    stmt = (
-        select(func.coalesce(func.max(DealVersion.version_number), 0))
-        .where(DealVersion.deal_id == deal_id)
+    stmt = select(func.coalesce(func.max(DealVersion.version_number), 0)).where(
+        DealVersion.deal_id == deal_id
     )
     result = await db.execute(stmt)
     return result.scalar_one() + 1
@@ -188,7 +190,9 @@ def _run_underwriting(deal_input: DealInput):
     return result
 
 
-def _deal_to_dict(deal: Deal, version: DealVersion | None = None, results: list | None = None) -> dict:
+def _deal_to_dict(
+    deal: Deal, version: DealVersion | None = None, results: list | None = None
+) -> dict:
     """Serialize a deal to API response."""
     d = {
         "id": str(deal.id),
@@ -216,7 +220,9 @@ def _deal_to_dict(deal: Deal, version: DealVersion | None = None, results: list 
             "label": version.label,
             "deal_input": version.deal_input,
             "change_summary": version.change_summary,
-            "created_at": version.created_at.isoformat() if version.created_at else None,
+            "created_at": version.created_at.isoformat()
+            if version.created_at
+            else None,
         }
     if results is not None:
         d["latest_results"] = {}
@@ -267,6 +273,7 @@ def _make_deal(
 # Deal CRUD
 # ---------------------------------------------------------------------------
 
+
 @router.post("", summary="Create a new deal")
 async def create_deal(body: DealCreateBody, db: AsyncSession = Depends(get_db)):
     """
@@ -309,6 +316,7 @@ async def create_deal(body: DealCreateBody, db: AsyncSession = Depends(get_db)):
 
     elif isinstance(body, DealCreateNL):
         from agents.deal_parser import DealParser
+
         parser = DealParser(api_key=settings.anthropic_api_key)
         parse_result = await parser.parse(body.text)
 
@@ -470,6 +478,7 @@ async def delete_deal(deal_id: str, db: AsyncSession = Depends(get_db)):
 # Versions
 # ---------------------------------------------------------------------------
 
+
 @router.post("/{deal_id}/versions", summary="Create a new version")
 async def create_version(
     deal_id: str,
@@ -534,6 +543,7 @@ async def list_versions(deal_id: str, db: AsyncSession = Depends(get_db)):
 # ---------------------------------------------------------------------------
 # Documents
 # ---------------------------------------------------------------------------
+
 
 @router.post("/{deal_id}/documents", summary="Upload a document")
 async def upload_document(
@@ -633,7 +643,10 @@ async def parse_document(
         parsed = await parser.parse_bytes(content, doc.doc_type)
 
         import dataclasses
-        parsed_dict = dataclasses.asdict(parsed) if dataclasses.is_dataclass(parsed) else {}
+
+        parsed_dict = (
+            dataclasses.asdict(parsed) if dataclasses.is_dataclass(parsed) else {}
+        )
 
         doc.parsed_data = parsed_dict
         doc.parse_status = ParseStatus.COMPLETED
@@ -660,7 +673,9 @@ async def parse_document(
         raise HTTPException(status_code=500, detail=f"Parse failed: {str(e)}")
 
 
-@router.post("/{deal_id}/documents/{doc_id}/apply", summary="Apply parsed data as new version")
+@router.post(
+    "/{deal_id}/documents/{doc_id}/apply", summary="Apply parsed data as new version"
+)
 async def apply_parsed_document(
     deal_id: str,
     doc_id: str,
@@ -705,13 +720,16 @@ async def apply_parsed_document(
 # Analysis (persistent underwriting)
 # ---------------------------------------------------------------------------
 
+
 @router.post("/{deal_id}/underwrite", summary="Run underwriting and save result")
 async def underwrite_deal(deal_id: str, db: AsyncSession = Depends(get_db)):
     """Run the underwriting engine on the primary version, persist the result."""
     deal = await _get_deal_or_404(db, deal_id)
     version = await _get_primary_version(db, deal.id)
     if not version:
-        raise HTTPException(status_code=400, detail="No version available to underwrite")
+        raise HTTPException(
+            status_code=400, detail="No version available to underwrite"
+        )
 
     deal_input = DealInput.model_validate(version.deal_input)
 
@@ -724,7 +742,10 @@ async def underwrite_deal(deal_id: str, db: AsyncSession = Depends(get_db)):
         version_id=version.id,
         result_type=ResultType.UNDERWRITING.value,
         result_data=result.model_dump(),
-        metadata_={"elapsed_seconds": elapsed, "version_number": version.version_number},
+        metadata_={
+            "elapsed_seconds": elapsed,
+            "version_number": version.version_number,
+        },
     )
     db.add(analysis)
 
@@ -793,6 +814,7 @@ async def get_result(deal_id: str, result_id: str, db: AsyncSession = Depends(ge
 # Deal Comparison
 # ---------------------------------------------------------------------------
 
+
 @router.post("/compare", summary="Compare deals side-by-side")
 async def compare_deals(body: CompareRequest, db: AsyncSession = Depends(get_db)):
     """Compare up to 5 deals side-by-side with their key metrics."""
@@ -826,7 +848,6 @@ async def compare_deals(body: CompareRequest, db: AsyncSession = Depends(get_db)
         if not deal:
             continue
 
-        primary = next((v for v in deal.versions if v.is_primary), None)
         latest = latest_by_deal.get(did)
 
         entry = {
@@ -835,7 +856,9 @@ async def compare_deals(body: CompareRequest, db: AsyncSession = Depends(get_db)
             "status": deal.status.value,
             "market": deal.market,
             "asset_class": deal.asset_class,
-            "purchase_price": float(deal.purchase_price) if deal.purchase_price else None,
+            "purchase_price": float(deal.purchase_price)
+            if deal.purchase_price
+            else None,
             "units": deal.units,
         }
 
@@ -860,6 +883,7 @@ async def compare_deals(body: CompareRequest, db: AsyncSession = Depends(get_db)
 # ---------------------------------------------------------------------------
 # Portfolios
 # ---------------------------------------------------------------------------
+
 
 @router.post("/portfolios", summary="Create portfolio", tags=["portfolios"])
 async def create_portfolio(body: PortfolioCreate, db: AsyncSession = Depends(get_db)):

@@ -44,6 +44,7 @@ async def get_db() -> AsyncGenerator:
     """FastAPI dependency that yields an async database session."""
     if async_session_factory is None:
         from fastapi import HTTPException
+
         raise HTTPException(
             status_code=503,
             detail="Database not available. Start PostgreSQL or run with docker-compose.",

@@ -8,18 +8,25 @@ PostgreSQL-specific features (ARRAY, JSONB) are patched to SQLite-compatible typ
 import sys
 import os
 import uuid
-from unittest.mock import patch, AsyncMock
 
 import pytest
 import pytest_asyncio
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sqlalchemy import JSON, String, event
+from sqlalchemy import JSON, String
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 from db.base import Base
-from db.models import Deal, DealStatus, DealVersion, Document, ParseStatus, AnalysisResult, Portfolio
+from db.models import (
+    Deal,
+    DealStatus,
+    DealVersion,
+    Document,
+    ParseStatus,
+    AnalysisResult,
+    Portfolio,
+)
 from api.deals import (
     _make_deal,
     _sync_deal_from_input,
@@ -28,8 +35,12 @@ from api.deals import (
     ResultType,
 )
 from engine.financial.models import (
-    DealInput, AssetClass, LoanInput, LoanType,
-    OperatingAssumptions, ExitAssumptions,
+    DealInput,
+    AssetClass,
+    LoanInput,
+    LoanType,
+    OperatingAssumptions,
+    ExitAssumptions,
 )
 
 
@@ -49,6 +60,7 @@ _pg_type_overrides = {
 def _patch_pg_types():
     """Patch PostgreSQL dialect types to work with SQLite."""
     import sqlalchemy.dialects.postgresql as pg
+
     original_jsonb = pg.JSONB
     original_uuid = pg.UUID
     original_array = pg.ARRAY
@@ -72,7 +84,9 @@ async def db_session():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    session_factory = async_sessionmaker(
+        engine, class_=AsyncSession, expire_on_commit=False
+    )
 
     async with session_factory() as session:
         yield session
@@ -83,6 +97,7 @@ async def db_session():
 # ---------------------------------------------------------------------------
 # Test fixtures
 # ---------------------------------------------------------------------------
+
 
 def _sample_deal_input() -> DealInput:
     return DealInput(
@@ -132,6 +147,7 @@ def sample_deal_input():
 # ---------------------------------------------------------------------------
 # Unit tests: helpers
 # ---------------------------------------------------------------------------
+
 
 class TestSyncDealFromInput:
     def test_syncs_all_fields(self, sample_deal_input):
@@ -228,11 +244,13 @@ class TestDealToDict:
     def test_with_results_deduplicates_by_type(self):
         deal = Deal(id=uuid.uuid4(), name="Test", status=DealStatus.SCREENING)
         r1 = AnalysisResult(
-            id=uuid.uuid4(), result_type="underwriting",
+            id=uuid.uuid4(),
+            result_type="underwriting",
             result_data={"metrics": {}},
         )
         r2 = AnalysisResult(
-            id=uuid.uuid4(), result_type="underwriting",
+            id=uuid.uuid4(),
+            result_type="underwriting",
             result_data={"metrics": {"old": True}},
         )
         d = _deal_to_dict(deal, results=[r1, r2])
@@ -252,6 +270,7 @@ class TestResultTypeEnum:
 # Integration tests: database operations
 # ---------------------------------------------------------------------------
 
+
 class TestDealDB:
     @pytest.mark.asyncio
     async def test_create_and_read_deal(self, db_session):
@@ -268,7 +287,10 @@ class TestDealDB:
         await db_session.commit()
 
         from sqlalchemy import select
-        result = await db_session.execute(select(Deal).where(Deal.name == "Austin Arms"))
+
+        result = await db_session.execute(
+            select(Deal).where(Deal.name == "Austin Arms")
+        )
         loaded = result.scalar_one()
         assert loaded.market == "Austin, TX"
         assert loaded.units == 24
@@ -284,6 +306,7 @@ class TestDealDB:
         await db_session.commit()
 
         from sqlalchemy import select
+
         result = await db_session.execute(
             select(Deal).where(Deal.name == "To Delete", Deal.deleted_at.is_(None))
         )
@@ -309,6 +332,7 @@ class TestDealVersionDB:
         await db_session.commit()
 
         from sqlalchemy import select
+
         result = await db_session.execute(
             select(DealVersion).where(DealVersion.deal_id == deal.id)
         )
@@ -318,7 +342,9 @@ class TestDealVersionDB:
         assert loaded.deal_input["purchase_price"] == 4_800_000
 
     @pytest.mark.asyncio
-    async def test_deal_input_roundtrips_through_json(self, db_session, sample_deal_input):
+    async def test_deal_input_roundtrips_through_json(
+        self, db_session, sample_deal_input
+    ):
         """DealInput survives serialization to JSONB and back."""
         deal = Deal(id=uuid.uuid4(), name="Test", status=DealStatus.SCREENING)
         db_session.add(deal)
@@ -336,6 +362,7 @@ class TestDealVersionDB:
         await db_session.commit()
 
         from sqlalchemy import select
+
         result = await db_session.execute(
             select(DealVersion).where(DealVersion.id == version.id)
         )
@@ -365,6 +392,7 @@ class TestDealVersionDB:
         await db_session.commit()
 
         from sqlalchemy import select
+
         result = await db_session.execute(
             select(DealVersion)
             .where(DealVersion.deal_id == deal.id)
@@ -405,6 +433,7 @@ class TestAnalysisResultDB:
         await db_session.commit()
 
         from sqlalchemy import select
+
         loaded_result = await db_session.execute(
             select(AnalysisResult).where(AnalysisResult.deal_id == deal.id)
         )
@@ -436,6 +465,7 @@ class TestDocumentDB:
         await db_session.commit()
 
         from sqlalchemy import select
+
         result = await db_session.execute(
             select(Document).where(Document.deal_id == deal.id)
         )
@@ -489,7 +519,10 @@ class TestPortfolioDB:
         await db_session.commit()
 
         from sqlalchemy import select, func
+
         count_result = await db_session.execute(
-            select(func.count()).select_from(Deal).where(Deal.portfolio_id == portfolio.id)
+            select(func.count())
+            .select_from(Deal)
+            .where(Deal.portfolio_id == portfolio.id)
         )
         assert count_result.scalar_one() == 3

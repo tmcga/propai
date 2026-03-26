@@ -23,22 +23,34 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from anthropic import AsyncAnthropic, APITimeoutError, RateLimitError, InternalServerError
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from anthropic import (
+    AsyncAnthropic,
+    APITimeoutError,
+    RateLimitError,
+    InternalServerError,
+)
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+)
 
 logger = logging.getLogger(__name__)
 
 
 # ── Input types ───────────────────────────────────────────────────────────
 
+
 @dataclass
 class AssetSnapshot:
     """Current performance of a single asset for reporting."""
+
     property_name: str
     market: str
     asset_class: str
-    units_or_sf: str                    # "24 units" or "40,000 SF"
-    acquisition_date: str               # "March 2023"
+    units_or_sf: str  # "24 units" or "40,000 SF"
+    acquisition_date: str  # "March 2023"
     acquisition_price: float
     current_value_estimate: float | None = None
 
@@ -55,7 +67,7 @@ class AssetSnapshot:
     equity_multiple_to_date: float = 0
 
     # vs. pro forma
-    noi_vs_proforma_pct: float = 0       # e.g. 0.03 = 3% above pro forma
+    noi_vs_proforma_pct: float = 0  # e.g. 0.03 = 3% above pro forma
     occupancy_vs_proforma_pct: float = 0
 
     # Capex / notable events
@@ -66,6 +78,7 @@ class AssetSnapshot:
 @dataclass
 class LPCommsInput:
     """Input for any LP communication."""
+
     comm_type: Literal[
         "monthly_update",
         "quarterly_report",
@@ -76,15 +89,15 @@ class LPCommsInput:
     ]
 
     # Fund / GP info
-    fund_name: str                       # "Acme Capital Fund I"
-    gp_name: str                         # "Tom McGahan"
-    gp_firm: str                         # "Acme Capital"
+    fund_name: str  # "Acme Capital Fund I"
+    gp_name: str  # "Tom McGahan"
+    gp_firm: str  # "Acme Capital"
 
     # LP info (optional — personalizes the greeting)
     lp_name: str | None = None
 
     # Reporting period
-    period: str = ""                     # "Q3 2025", "October 2025", "FY 2025"
+    period: str = ""  # "Q3 2025", "October 2025", "FY 2025"
 
     # Assets in this communication
     assets: list[AssetSnapshot] = field(default_factory=list)
@@ -92,8 +105,10 @@ class LPCommsInput:
     # Distribution info (for distribution_announcement, monthly_update)
     distribution_amount: float | None = None
     distribution_per_unit: float | None = None  # per LP unit/share
-    distribution_date: str | None = None         # "November 15, 2025"
-    distribution_type: str = "Preferred Return"  # or "Return of Capital", "Profit Distribution"
+    distribution_date: str | None = None  # "November 15, 2025"
+    distribution_type: str = (
+        "Preferred Return"  # or "Return of Capital", "Profit Distribution"
+    )
 
     # Capital call info (for capital_call)
     capital_call_amount: float | None = None
@@ -106,7 +121,7 @@ class LPCommsInput:
     # Tone / style
     tone: Literal["formal", "professional", "warm"] = "professional"
     include_disclaimer: bool = True
-    additional_context: str = ""        # GP's own notes or color
+    additional_context: str = ""  # GP's own notes or color
 
 
 @dataclass
@@ -114,8 +129,8 @@ class LPCommOutput:
     comm_type: str
     subject_line: str
     body_markdown: str
-    key_numbers: dict[str, str]         # formatted metrics for quick reference
-    action_items: list[str]             # what the LP needs to do (if anything)
+    key_numbers: dict[str, str]  # formatted metrics for quick reference
+    action_items: list[str]  # what the LP needs to do (if anything)
     disclaimer: str
 
 
@@ -140,7 +155,6 @@ COMM_PROMPTS = {
 5. Market Commentary (2-3 sentences on macro conditions relevant to the portfolio)
 6. What's Next (upcoming milestones, expected decisions)
 7. Closing""",
-
     "quarterly_report": """Write a formal quarterly investor report. Structure:
 1. Executive Summary (quarter highlights, overall performance vs. proforma)
 2. Financial Performance (detailed metrics per asset — NOI, occupancy, DSCR, distributions)
@@ -150,7 +164,6 @@ COMM_PROMPTS = {
 6. Market Conditions (macro and local market context)
 7. Outlook (next quarter priorities, any risks or opportunities)
 8. Closing""",
-
     "distribution_announcement": """Write a distribution announcement email. Keep it concise.
 Structure:
 1. Subject line and opening announcement
@@ -159,7 +172,6 @@ Structure:
 4. Brief portfolio color (1 paragraph — what's driving performance)
 5. Wire/payment instructions reminder
 6. Closing""",
-
     "capital_call": """Write a capital call notice. This must be professional, clear, and include
 all necessary details. Structure:
 1. Clear subject line indicating capital call
@@ -170,7 +182,6 @@ all necessary details. Structure:
 6. Impact on projected returns (if applicable)
 7. Contact information for questions
 8. Legal notice language""",
-
     "new_deal_announcement": """Write a new acquisition announcement / deal one-pager for LPs.
 Structure:
 1. Investment Headline (property name, market, asset class, price)
@@ -180,7 +191,6 @@ Structure:
 5. Business Plan (what we plan to do with this asset)
 6. Risk Factors (2-3 key risks and mitigants)
 7. Next Steps (for LPs interested in co-investing or asking questions)""",
-
     "annual_report": """Write a comprehensive annual investor report. Structure:
 1. Letter to Investors (from GP — personal, forward-looking)
 2. Year in Review (portfolio highlights, key events)
@@ -194,7 +204,6 @@ Structure:
 
 
 class LPCommsAgent:
-
     def __init__(self) -> None:
         self.client = AsyncAnthropic()
 
@@ -251,18 +260,28 @@ class LPCommsAgent:
         if inp.assets:
             lines.append("\nPORTFOLIO ASSETS:")
             for a in inp.assets:
-                lines.append(f"\n  {a.property_name} ({a.market} | {a.asset_class} | {a.units_or_sf})")
-                lines.append(f"    Acquired: {a.acquisition_date} for ${a.acquisition_price:,.0f}")
+                lines.append(
+                    f"\n  {a.property_name} ({a.market} | {a.asset_class} | {a.units_or_sf})"
+                )
+                lines.append(
+                    f"    Acquired: {a.acquisition_date} for ${a.acquisition_price:,.0f}"
+                )
                 if a.current_value_estimate:
-                    lines.append(f"    Current Est. Value: ${a.current_value_estimate:,.0f}")
+                    lines.append(
+                        f"    Current Est. Value: ${a.current_value_estimate:,.0f}"
+                    )
                 lines.append(f"    Period NOI: ${a.period_noi:,.0f}")
                 lines.append(f"    Period Occupancy: {a.period_occupancy:.1%}")
                 lines.append(f"    Period DSCR: {a.period_dscr:.2f}x")
                 lines.append(f"    Period CoC: {a.period_coc_return:.1%}")
                 lines.append(f"    NOI vs Pro Forma: {a.noi_vs_proforma_pct:+.1%}")
                 lines.append(f"    YTD Distributions: ${a.ytd_distributions:,.0f}")
-                lines.append(f"    Total Distributions to Date: ${a.total_distributions_to_date:,.0f}")
-                lines.append(f"    Equity Multiple to Date: {a.equity_multiple_to_date:.2f}x")
+                lines.append(
+                    f"    Total Distributions to Date: ${a.total_distributions_to_date:,.0f}"
+                )
+                lines.append(
+                    f"    Equity Multiple to Date: {a.equity_multiple_to_date:.2f}x"
+                )
                 if a.capex_spend_period:
                     lines.append(f"    CapEx This Period: ${a.capex_spend_period:,.0f}")
                 if a.notable_updates:
@@ -271,7 +290,7 @@ class LPCommsAgent:
                         lines.append(f"      - {u}")
 
         if inp.distribution_amount is not None:
-            lines.append(f"\nDISTRIBUTION:")
+            lines.append("\nDISTRIBUTION:")
             lines.append(f"  Amount: ${inp.distribution_amount:,.0f}")
             if inp.distribution_per_unit:
                 lines.append(f"  Per Unit: ${inp.distribution_per_unit:,.4f}")
@@ -280,7 +299,7 @@ class LPCommsAgent:
             lines.append(f"  Type: {inp.distribution_type}")
 
         if inp.capital_call_amount is not None:
-            lines.append(f"\nCAPITAL CALL:")
+            lines.append("\nCAPITAL CALL:")
             lines.append(f"  Amount: ${inp.capital_call_amount:,.0f}")
             if inp.capital_call_due_date:
                 lines.append(f"  Due: {inp.capital_call_due_date}")
@@ -300,7 +319,9 @@ class LPCommsAgent:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
-        retry=retry_if_exception_type((APITimeoutError, RateLimitError, InternalServerError)),
+        retry=retry_if_exception_type(
+            (APITimeoutError, RateLimitError, InternalServerError)
+        ),
         reraise=True,
     )
     async def _call_api(self, comm_prompt: str, context: str):
@@ -308,9 +329,10 @@ class LPCommsAgent:
             model="claude-opus-4-6",
             max_tokens=4096,
             system=SYSTEM_PROMPT,
-            messages=[{
-                "role": "user",
-                "content": f"""{comm_prompt}
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"""{comm_prompt}
 
 COMMUNICATION CONTEXT:
 {context}
@@ -323,6 +345,7 @@ Return a JSON object with these exact keys:
   "action_items": ["action 1", "action 2"]
 }}
 
-Return ONLY valid JSON."""
-            }],
+Return ONLY valid JSON.""",
+                }
+            ],
         )

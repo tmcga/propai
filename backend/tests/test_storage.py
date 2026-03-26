@@ -4,7 +4,6 @@ Tests for the file storage backend.
 
 import sys
 import os
-import tempfile
 
 import pytest
 

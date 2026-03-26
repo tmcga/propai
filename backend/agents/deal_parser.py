@@ -17,13 +17,17 @@ and flags anything it had to assume vs. what was explicitly stated.
 from __future__ import annotations
 
 import os
-import json
 import logging
 from dataclasses import dataclass, field
 from typing import Optional
 
 import anthropic
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+)
 
 from engine.financial.models import (
     DealInput,
@@ -41,9 +45,10 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ParseResult:
     """Result from the NL deal parser."""
+
     deal_input: Optional[DealInput] = None
-    extracted_values: dict = field(default_factory=dict)   # What was explicitly stated
-    assumed_values: dict = field(default_factory=dict)     # What was inferred/defaulted
+    extracted_values: dict = field(default_factory=dict)  # What was explicitly stated
+    assumed_values: dict = field(default_factory=dict)  # What was inferred/defaulted
     clarifications_needed: list[str] = field(default_factory=list)
     raw_extraction: dict = field(default_factory=dict)
     success: bool = False
@@ -60,70 +65,142 @@ EXTRACTION_SCHEMA = {
             "name": {"type": "string", "description": "Deal name or property address"},
             "asset_class": {
                 "type": "string",
-                "enum": ["sfr", "small_multifamily", "multifamily", "office", "retail",
-                         "mixed_use", "industrial", "self_storage", "str", "ground_up"],
-                "description": "Property type"
+                "enum": [
+                    "sfr",
+                    "small_multifamily",
+                    "multifamily",
+                    "office",
+                    "retail",
+                    "mixed_use",
+                    "industrial",
+                    "self_storage",
+                    "str",
+                    "ground_up",
+                ],
+                "description": "Property type",
             },
-            "market": {"type": "string", "description": "City, state (e.g., 'Austin, TX')"},
-            "purchase_price": {"type": "number", "description": "Purchase price in dollars"},
-            "units": {"type": "integer", "description": "Number of units (multifamily)"},
-            "square_feet": {"type": "number", "description": "Total rentable square footage"},
+            "market": {
+                "type": "string",
+                "description": "City, state (e.g., 'Austin, TX')",
+            },
+            "purchase_price": {
+                "type": "number",
+                "description": "Purchase price in dollars",
+            },
+            "units": {
+                "type": "integer",
+                "description": "Number of units (multifamily)",
+            },
+            "square_feet": {
+                "type": "number",
+                "description": "Total rentable square footage",
+            },
             "year_built": {"type": "integer", "description": "Year property was built"},
-
             # Financing
             "ltv": {"type": "number", "description": "Loan-to-value ratio (0.0–1.0)"},
-            "interest_rate": {"type": "number", "description": "Annual interest rate (0.0–1.0)"},
-            "amortization_years": {"type": "integer", "description": "Loan amortization in years"},
-            "loan_type": {"type": "string", "enum": ["fixed", "interest_only", "io_then_amortizing"]},
-            "io_period_years": {"type": "integer", "description": "IO period years if applicable"},
-
+            "interest_rate": {
+                "type": "number",
+                "description": "Annual interest rate (0.0–1.0)",
+            },
+            "amortization_years": {
+                "type": "integer",
+                "description": "Loan amortization in years",
+            },
+            "loan_type": {
+                "type": "string",
+                "enum": ["fixed", "interest_only", "io_then_amortizing"],
+            },
+            "io_period_years": {
+                "type": "integer",
+                "description": "IO period years if applicable",
+            },
             # Revenue
-            "gross_scheduled_income": {"type": "number", "description": "Annual gross rents at 100% occupancy"},
-            "monthly_rent_per_unit": {"type": "number", "description": "Monthly rent per unit (used to compute GSI if units known)"},
+            "gross_scheduled_income": {
+                "type": "number",
+                "description": "Annual gross rents at 100% occupancy",
+            },
+            "monthly_rent_per_unit": {
+                "type": "number",
+                "description": "Monthly rent per unit (used to compute GSI if units known)",
+            },
             "vacancy_rate": {"type": "number", "description": "Vacancy rate (0.0–1.0)"},
-            "other_income_annual": {"type": "number", "description": "Other annual income"},
-
+            "other_income_annual": {
+                "type": "number",
+                "description": "Other annual income",
+            },
             # Expenses
-            "property_taxes_annual": {"type": "number", "description": "Annual property taxes"},
+            "property_taxes_annual": {
+                "type": "number",
+                "description": "Annual property taxes",
+            },
             "insurance_annual": {"type": "number", "description": "Annual insurance"},
-            "management_fee_pct": {"type": "number", "description": "Management fee as % of EGI"},
-            "maintenance_annual": {"type": "number", "description": "Annual maintenance/repairs"},
+            "management_fee_pct": {
+                "type": "number",
+                "description": "Management fee as % of EGI",
+            },
+            "maintenance_annual": {
+                "type": "number",
+                "description": "Annual maintenance/repairs",
+            },
             "capex_annual": {"type": "number", "description": "Annual CapEx reserves"},
-            "utilities_annual": {"type": "number", "description": "Annual utilities (owner-paid)"},
-
+            "utilities_annual": {
+                "type": "number",
+                "description": "Annual utilities (owner-paid)",
+            },
             # Growth
-            "rent_growth_rate": {"type": "number", "description": "Annual rent growth rate"},
-            "expense_growth_rate": {"type": "number", "description": "Annual expense growth rate"},
-
+            "rent_growth_rate": {
+                "type": "number",
+                "description": "Annual rent growth rate",
+            },
+            "expense_growth_rate": {
+                "type": "number",
+                "description": "Annual expense growth rate",
+            },
             # Exit
-            "hold_period_years": {"type": "integer", "description": "Hold period in years"},
-            "exit_cap_rate": {"type": "number", "description": "Exit cap rate (0.0–1.0)"},
-            "selling_costs_pct": {"type": "number", "description": "Selling costs as % of price"},
+            "hold_period_years": {
+                "type": "integer",
+                "description": "Hold period in years",
+            },
+            "exit_cap_rate": {
+                "type": "number",
+                "description": "Exit cap rate (0.0–1.0)",
+            },
+            "selling_costs_pct": {
+                "type": "number",
+                "description": "Selling costs as % of price",
+            },
             "discount_rate": {"type": "number", "description": "Discount rate for NPV"},
-
             # Equity structure
             "lp_equity_pct": {"type": "number", "description": "LP equity percentage"},
-            "preferred_return": {"type": "number", "description": "LP preferred return rate"},
-
+            "preferred_return": {
+                "type": "number",
+                "description": "LP preferred return rate",
+            },
             # Metadata
             "explicitly_stated": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "List of field names that were explicitly stated in the input"
+                "description": "List of field names that were explicitly stated in the input",
             },
             "assumed": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "List of field names that were inferred or defaulted"
+                "description": "List of field names that were inferred or defaulted",
             },
             "clarifications_needed": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Questions to ask the user to improve accuracy"
+                "description": "Questions to ask the user to improve accuracy",
             },
         },
-        "required": ["name", "asset_class", "purchase_price", "explicitly_stated", "assumed"],
-    }
+        "required": [
+            "name",
+            "asset_class",
+            "purchase_price",
+            "explicitly_stated",
+            "assumed",
+        ],
+    },
 }
 
 PARSER_SYSTEM_PROMPT = """You are a real estate underwriting assistant that extracts deal parameters
@@ -215,10 +292,16 @@ class DealParser:
                 return result
 
             result.raw_extraction = tool_result
-            result.extracted_values = {k: v for k in tool_result.get("explicitly_stated", [])
-                                        if (v := tool_result.get(k)) is not None}
-            result.assumed_values = {k: v for k in tool_result.get("assumed", [])
-                                     if (v := tool_result.get(k)) is not None}
+            result.extracted_values = {
+                k: v
+                for k in tool_result.get("explicitly_stated", [])
+                if (v := tool_result.get(k)) is not None
+            }
+            result.assumed_values = {
+                k: v
+                for k in tool_result.get("assumed", [])
+                if (v := tool_result.get(k)) is not None
+            }
             result.clarifications_needed = tool_result.get("clarifications_needed", [])
 
             # Build DealInput from extracted values
@@ -228,7 +311,9 @@ class DealParser:
         except anthropic.AuthenticationError:
             result.error = "Invalid ANTHROPIC_API_KEY. Check your .env configuration."
         except anthropic.APIConnectionError:
-            result.error = "Could not connect to Anthropic API. Check your internet connection."
+            result.error = (
+                "Could not connect to Anthropic API. Check your internet connection."
+            )
         except Exception as e:
             result.error = f"Parse failed: {str(e)}"
             logger.error("DealParser error", exc_info=True)
@@ -238,7 +323,13 @@ class DealParser:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
-        retry=retry_if_exception_type((anthropic.APITimeoutError, anthropic.RateLimitError, anthropic.InternalServerError)),
+        retry=retry_if_exception_type(
+            (
+                anthropic.APITimeoutError,
+                anthropic.RateLimitError,
+                anthropic.InternalServerError,
+            )
+        ),
         reraise=True,
     )
     async def _call_api(self, client: anthropic.AsyncAnthropic, text: str):
@@ -249,10 +340,12 @@ class DealParser:
             system=PARSER_SYSTEM_PROMPT,
             tools=[EXTRACTION_SCHEMA],
             tool_choice={"type": "tool", "name": "extract_deal"},
-            messages=[{
-                "role": "user",
-                "content": f"Extract deal parameters from this description:\n\n{text}"
-            }],
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"Extract deal parameters from this description:\n\n{text}",
+                }
+            ],
         )
 
     def _build_deal_input(self, raw: dict) -> DealInput:
@@ -281,7 +374,7 @@ class DealParser:
             or gsi * 0.05
         )
         capex = raw.get("capex_annual") or (
-            (raw.get("units") or 0) * 600   # $50/unit/mo default
+            (raw.get("units") or 0) * 600  # $50/unit/mo default
             or 0.0
         )
 
@@ -328,5 +421,7 @@ class DealParser:
                 lp_equity_pct=float(raw.get("lp_equity_pct", 0.90)),
                 gp_equity_pct=1.0 - float(raw.get("lp_equity_pct", 0.90)),
                 preferred_return=float(raw.get("preferred_return", 0.08)),
-            ) if raw.get("lp_equity_pct") else None,
+            )
+            if raw.get("lp_equity_pct")
+            else None,
         )

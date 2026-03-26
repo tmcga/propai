@@ -16,35 +16,44 @@ import logging
 from dataclasses import dataclass, field
 from typing import Literal
 
-from anthropic import AsyncAnthropic, APITimeoutError, RateLimitError, InternalServerError
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from anthropic import (
+    AsyncAnthropic,
+    APITimeoutError,
+    RateLimitError,
+    InternalServerError,
+)
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+)
 
 logger = logging.getLogger(__name__)
-
-from engine.financial import metrics as m
-from engine.financial.models import DealInput, LoanInput, OperatingAssumptions, ExitAssumptions
 
 
 # ── Pydantic-free dataclass for lightweight screening input ───────────────
 
+
 @dataclass
 class ScreenInput:
     """Minimal inputs needed for a 30-second deal screen."""
+
     asset_class: str
     purchase_price: float
     market: str
 
     # Income
-    gross_scheduled_income: float         # annual, or 0 if unknown
+    gross_scheduled_income: float  # annual, or 0 if unknown
     units: int | None = None
-    avg_unit_rent: float | None = None    # monthly; auto-computes GSI if provided
+    avg_unit_rent: float | None = None  # monthly; auto-computes GSI if provided
     square_feet: float | None = None
     asking_rent_per_sf: float | None = None  # annual NNN
 
     # Expense estimates (optional — defaults applied)
     vacancy_rate: float = 0.05
-    expense_ratio: float | None = None    # overrides individual items if provided
-    noi_override: float | None = None     # if seller provides NOI directly
+    expense_ratio: float | None = None  # overrides individual items if provided
+    noi_override: float | None = None  # if seller provides NOI directly
 
     # Financing assumptions
     ltv: float = 0.70
@@ -53,17 +62,21 @@ class ScreenInput:
 
     # Exit
     hold_period_years: int = 5
-    exit_cap_rate: float | None = None    # estimated from market if not provided
+    exit_cap_rate: float | None = None  # estimated from market if not provided
 
     # Context
-    additional_notes: str = ""            # broker notes, property description, etc.
+    additional_notes: str = ""  # broker notes, property description, etc.
 
     def __post_init__(self) -> None:
         # Auto-compute GSI from unit count + avg rent
         if self.gross_scheduled_income == 0 and self.units and self.avg_unit_rent:
             self.gross_scheduled_income = self.units * self.avg_unit_rent * 12
         # Auto-compute GSI from SF + rent/SF (NNN)
-        if self.gross_scheduled_income == 0 and self.square_feet and self.asking_rent_per_sf:
+        if (
+            self.gross_scheduled_income == 0
+            and self.square_feet
+            and self.asking_rent_per_sf
+        ):
             self.gross_scheduled_income = self.square_feet * self.asking_rent_per_sf
 
 
@@ -82,7 +95,7 @@ class ScreenVerdict:
     grm: float
 
     # Reasoning
-    headline: str                          # one-line verdict
+    headline: str  # one-line verdict
     strengths: list[str] = field(default_factory=list)
     concerns: list[str] = field(default_factory=list)
     missing_info: list[str] = field(default_factory=list)
@@ -110,7 +123,7 @@ EXPENSE_RATIO_BENCHMARKS: dict[str, float] = {
     "small_multifamily": 0.40,
     "sfr": 0.35,
     "office": 0.40,
-    "retail": 0.30,      # NNN — tenant pays most
+    "retail": 0.30,  # NNN — tenant pays most
     "industrial": 0.25,  # NNN
     "self_storage": 0.35,
     "mixed_use": 0.42,
@@ -150,18 +163,26 @@ class DealScreener:
     def _math_pass(self, inp: ScreenInput) -> dict:
         """Compute metrics from the minimal inputs available."""
         egi = inp.gross_scheduled_income * (1 - inp.vacancy_rate)
-        expense_ratio = inp.expense_ratio or EXPENSE_RATIO_BENCHMARKS.get(inp.asset_class, 0.45)
+        expense_ratio = inp.expense_ratio or EXPENSE_RATIO_BENCHMARKS.get(
+            inp.asset_class, 0.45
+        )
         estimated_noi = inp.noi_override or (egi * (1 - expense_ratio))
         cap_rate = estimated_noi / inp.purchase_price if inp.purchase_price else 0
 
-        exit_cap = inp.exit_cap_rate or MARKET_CAP_BENCHMARKS.get(inp.asset_class, 0.055)
+        exit_cap = inp.exit_cap_rate or MARKET_CAP_BENCHMARKS.get(
+            inp.asset_class, 0.055
+        )
         loan_amount = inp.purchase_price * inp.ltv
-        equity = inp.purchase_price * (1 - inp.ltv) + inp.purchase_price * 0.01  # rough closing
+        equity = (
+            inp.purchase_price * (1 - inp.ltv) + inp.purchase_price * 0.01
+        )  # rough closing
 
         # Debt service
         r = inp.interest_rate / 12
         n = inp.amortization_years * 12
-        monthly_payment = loan_amount * (r * (1 + r) ** n) / ((1 + r) ** n - 1) if r > 0 else 0
+        monthly_payment = (
+            loan_amount * (r * (1 + r) ** n) / ((1 + r) ** n - 1) if r > 0 else 0
+        )
         annual_ds = monthly_payment * 12
 
         dscr = estimated_noi / annual_ds if annual_ds > 0 else 0
@@ -170,10 +191,16 @@ class DealScreener:
 
         # Rough IRR range (low: no rent growth, high: 3% rent growth)
         def rough_irr(rent_growth: float) -> float:
-            noi_exit = estimated_noi * ((1 + rent_growth) ** inp.hold_period_years) * (1 + rent_growth)
+            noi_exit = (
+                estimated_noi
+                * ((1 + rent_growth) ** inp.hold_period_years)
+                * (1 + rent_growth)
+            )
             exit_value = noi_exit / exit_cap
             sale_proceeds = exit_value * (1 - 0.03) - loan_amount
-            total_cfs = [btcf * (1 + rent_growth) ** y for y in range(inp.hold_period_years)]
+            total_cfs = [
+                btcf * (1 + rent_growth) ** y for y in range(inp.hold_period_years)
+            ]
             total_cfs[-1] += sale_proceeds
             # simple approximation
             total_return = sum(total_cfs) / equity
@@ -183,7 +210,11 @@ class DealScreener:
         irr_low = rough_irr(0.0)
         irr_high = rough_irr(0.035)
 
-        grm = inp.purchase_price / inp.gross_scheduled_income if inp.gross_scheduled_income else 0
+        grm = (
+            inp.purchase_price / inp.gross_scheduled_income
+            if inp.gross_scheduled_income
+            else 0
+        )
         ppu = inp.purchase_price / inp.units if inp.units else None
         ppsf = inp.purchase_price / inp.square_feet if inp.square_feet else None
 
@@ -222,28 +253,28 @@ DEAL INPUTS:
 - Asset class: {inp.asset_class}
 - Market: {inp.market}
 - Purchase price: ${inp.purchase_price:,.0f}
-- Units: {inp.units or 'N/A'}
-- Square feet: {inp.square_feet or 'N/A'}
+- Units: {inp.units or "N/A"}
+- Square feet: {inp.square_feet or "N/A"}
 - Gross scheduled income: ${inp.gross_scheduled_income:,.0f}/yr
 - Vacancy assumption: {inp.vacancy_rate:.0%}
 - LTV: {inp.ltv:.0%} @ {inp.interest_rate:.2%}
 - Hold period: {inp.hold_period_years} years
-- Additional notes: {inp.additional_notes or 'None'}
+- Additional notes: {inp.additional_notes or "None"}
 
 COMPUTED METRICS:
-- Estimated NOI: ${math['estimated_noi']:,.0f} (using {math['expense_ratio_used']:.0%} expense ratio)
-- Going-in cap rate: {math['cap_rate']:.2%}
-- DSCR: {math['dscr']:.2f}x
-- Cash-on-cash (Yr 1): {math['coc']:.1%}
-- IRR range: {math['irr_low']:.1%} – {math['irr_high']:.1%}
-- GRM: {math['grm']:.1f}x
-- Price/unit: {f"${math['price_per_unit']:,.0f}" if math['price_per_unit'] else "N/A"}
-- Price/SF: {f"${math['price_per_sf']:.2f}" if math['price_per_sf'] else "N/A"}
-- Suggested max price (at {thresholds['target_cap_rate']:.1%} cap): {f"${math['max_price_at_target_cap']:,.0f}" if math['max_price_at_target_cap'] else "N/A"}
+- Estimated NOI: ${math["estimated_noi"]:,.0f} (using {math["expense_ratio_used"]:.0%} expense ratio)
+- Going-in cap rate: {math["cap_rate"]:.2%}
+- DSCR: {math["dscr"]:.2f}x
+- Cash-on-cash (Yr 1): {math["coc"]:.1%}
+- IRR range: {math["irr_low"]:.1%} – {math["irr_high"]:.1%}
+- GRM: {math["grm"]:.1f}x
+- Price/unit: {f"${math['price_per_unit']:,.0f}" if math["price_per_unit"] else "N/A"}
+- Price/SF: {f"${math['price_per_sf']:.2f}" if math["price_per_sf"] else "N/A"}
+- Suggested max price (at {thresholds["target_cap_rate"]:.1%} cap): {f"${math['max_price_at_target_cap']:,.0f}" if math["max_price_at_target_cap"] else "N/A"}
 
 SCREENING THRESHOLDS:
-- Minimum: {thresholds['min_cap_rate']:.1%} cap, {thresholds['min_dscr']:.2f}x DSCR, {thresholds['min_coc']:.0%} CoC, {thresholds['min_irr']:.0%} IRR
-- Target: {thresholds['target_cap_rate']:.1%} cap, {thresholds['target_dscr']:.2f}x DSCR, {thresholds['target_coc']:.0%} CoC, {thresholds['target_irr']:.0%} IRR
+- Minimum: {thresholds["min_cap_rate"]:.1%} cap, {thresholds["min_dscr"]:.2f}x DSCR, {thresholds["min_coc"]:.0%} CoC, {thresholds["min_irr"]:.0%} IRR
+- Target: {thresholds["target_cap_rate"]:.1%} cap, {thresholds["target_dscr"]:.2f}x DSCR, {thresholds["target_coc"]:.0%} CoC, {thresholds["target_irr"]:.0%} IRR
 
 Return ONLY valid JSON (no markdown, no explanation outside JSON):
 {{
@@ -274,7 +305,9 @@ Be direct. Real investors don't need hedging — they need a clear signal."""
         try:
             ai = json.loads(raw)
         except json.JSONDecodeError:
-            logger.warning("DealScreener: failed to parse LLM JSON, returning conservative verdict")
+            logger.warning(
+                "DealScreener: failed to parse LLM JSON, returning conservative verdict"
+            )
             ai = {
                 "verdict": "SOFT_GO",
                 "confidence": "LOW",
@@ -306,7 +339,9 @@ Be direct. Real investors don't need hedging — they need a clear signal."""
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
-        retry=retry_if_exception_type((APITimeoutError, RateLimitError, InternalServerError)),
+        retry=retry_if_exception_type(
+            (APITimeoutError, RateLimitError, InternalServerError)
+        ),
         reraise=True,
     )
     async def _call_api(self, prompt: str):

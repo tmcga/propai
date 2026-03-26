@@ -10,17 +10,15 @@ GET  /api/ai/memo/demo      — Demo memo (no API key required, uses cached cont
 from __future__ import annotations
 
 import os
-import re
-import json
 from typing import Optional
-from fastapi import APIRouter, HTTPException, BackgroundTasks
-from fastapi.responses import HTMLResponse, Response
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from engine.financial import ProFormaEngine, WaterfallEngine
 from engine.financial.models import DealInput
 from agents.memo_agent import MemoAgent, InvestmentMemo
-from agents.deal_parser import DealParser, ParseResult
+from agents.deal_parser import DealParser
 from data.market_service import MarketService
 
 router = APIRouter(prefix="/api/ai", tags=["AI"])
@@ -30,23 +28,24 @@ router = APIRouter(prefix="/api/ai", tags=["AI"])
 # Request/Response models
 # ---------------------------------------------------------------------------
 
+
 class MemoRequest(BaseModel):
     deal: DealInput
     include_market_data: bool = True
-    sections: Optional[list[str]] = None   # Generate specific sections only
-    format: str = "json"                   # "json" | "html" | "pdf"
+    sections: Optional[list[str]] = None  # Generate specific sections only
+    format: str = "json"  # "json" | "html" | "pdf"
 
 
 class ParseRequest(BaseModel):
     text: str
-    underwrite: bool = True   # Also run underwriting on the parsed deal
+    underwrite: bool = True  # Also run underwriting on the parsed deal
 
 
 class AnalyzeRequest(BaseModel):
     text: str
     include_memo: bool = True
     include_market_data: bool = True
-    memo_format: str = "json"   # "json" | "html"
+    memo_format: str = "json"  # "json" | "html"
 
 
 class AnalyzeResponse(BaseModel):
@@ -60,6 +59,7 @@ class AnalyzeResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.post("/memo", summary="Generate AI investment memo")
 async def generate_memo(request: MemoRequest):
@@ -98,8 +98,10 @@ async def generate_memo(request: MemoRequest):
                     fred_key=os.getenv("FRED_API_KEY"),
                     hud_token=os.getenv("HUD_API_TOKEN"),
                 )
-                market_report = await service.get_market_report(metro=request.deal.market)
-            except Exception as e:
+                market_report = await service.get_market_report(
+                    metro=request.deal.market
+                )
+            except Exception:
                 # Market data is nice-to-have; don't fail the memo for it
                 pass
 
@@ -125,7 +127,9 @@ async def generate_memo(request: MemoRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/parse", response_model=dict, summary="Parse natural language deal description")
+@router.post(
+    "/parse", response_model=dict, summary="Parse natural language deal description"
+)
 async def parse_deal(request: ParseRequest):
     """
     Convert a free-text deal description into a structured DealInput object.
@@ -150,7 +154,9 @@ async def parse_deal(request: ParseRequest):
 
         response = {
             "success": True,
-            "deal": parse_result.deal_input.model_dump() if parse_result.deal_input else None,
+            "deal": parse_result.deal_input.model_dump()
+            if parse_result.deal_input
+            else None,
             "extracted_values": parse_result.extracted_values,
             "assumed_values": parse_result.assumed_values,
             "clarifications_needed": parse_result.clarifications_needed,
@@ -208,8 +214,7 @@ async def analyze_deal(request: AnalyzeRequest):
 
         if not parse_result.success or not parse_result.deal_input:
             raise HTTPException(
-                status_code=422,
-                detail=f"Could not parse deal: {parse_result.error}"
+                status_code=422, detail=f"Could not parse deal: {parse_result.error}"
             )
 
         deal = parse_result.deal_input
@@ -276,7 +281,9 @@ async def analyze_deal(request: AnalyzeRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/memo/demo", response_class=HTMLResponse, summary="Demo memo (no API key needed)")
+@router.get(
+    "/memo/demo", response_class=HTMLResponse, summary="Demo memo (no API key needed)"
+)
 async def demo_memo():
     """
     Returns a pre-rendered demo investment memo for the Austin, TX sample deal.
@@ -285,9 +292,6 @@ async def demo_memo():
     Perfect for UI development and showcasing the design.
     """
     from api.underwriting import sample_deal
-    from engine.financial.models import (
-        LoanInput, OperatingAssumptions, ExitAssumptions, EquityStructure, LoanType, AssetClass
-    )
 
     deal = await sample_deal()
     engine = ProFormaEngine(deal)
@@ -427,6 +431,7 @@ and held as a long-term income vehicle if market conditions favor continued owne
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _memo_to_dict(memo: InvestmentMemo) -> dict:
     """Serialize InvestmentMemo to JSON-safe dict."""
     return {
@@ -456,12 +461,18 @@ def _render_memo_html(memo, result, deal, market) -> str:
         from jinja2 import Environment, FileSystemLoader, select_autoescape
         import markdown
 
-        templates_dir = str(TEMPLATES_DIR if 'TEMPLATES_DIR' in dir() else
-                            __file__.replace('api/ai.py', 'templates'))
+        templates_dir = str(
+            TEMPLATES_DIR
+            if "TEMPLATES_DIR" in dir()
+            else __file__.replace("api/ai.py", "templates")
+        )
 
         # Find templates dir relative to this file
         import os as _os
-        templates_dir = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "templates")
+
+        templates_dir = _os.path.join(
+            _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "templates"
+        )
 
         env = Environment(
             loader=FileSystemLoader(templates_dir),
@@ -496,6 +507,6 @@ def _render_memo_html(memo, result, deal, market) -> str:
         return f"<html><body><p>Render error: {e}</p></body></html>"
 
 
-# Import TEMPLATES_DIR
-from pathlib import Path
+from pathlib import Path  # noqa: E402
+
 TEMPLATES_DIR = Path(__file__).parent.parent / "templates"

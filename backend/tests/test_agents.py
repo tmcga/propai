@@ -8,8 +8,7 @@ the Anthropic client's messages.create() method.
 import sys
 import os
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
-from dataclasses import dataclass
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -22,6 +21,7 @@ from agents.document_parser import DocumentParser
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_message(text: str):
     """Create a mock Anthropic message response."""
@@ -47,6 +47,7 @@ def _make_tool_message(tool_name: str, tool_input: dict):
 # ---------------------------------------------------------------------------
 # DealScreener Tests
 # ---------------------------------------------------------------------------
+
 
 class TestDealScreener:
     @pytest.fixture
@@ -78,15 +79,17 @@ class TestDealScreener:
     @pytest.mark.asyncio
     async def test_screen_with_mocked_ai(self, screen_input):
         """Full screen with mocked AI response."""
-        ai_response = json.dumps({
-            "verdict": "SOFT_GO",
-            "confidence": "MEDIUM",
-            "headline": "Deal pencils at target metrics.",
-            "strengths": ["Strong market", "Good basis"],
-            "concerns": ["Supply risk"],
-            "missing_info": [],
-            "full_reasoning": "The deal looks reasonable.",
-        })
+        ai_response = json.dumps(
+            {
+                "verdict": "SOFT_GO",
+                "confidence": "MEDIUM",
+                "headline": "Deal pencils at target metrics.",
+                "strengths": ["Strong market", "Good basis"],
+                "concerns": ["Supply risk"],
+                "missing_info": [],
+                "full_reasoning": "The deal looks reasonable.",
+            }
+        )
 
         screener = DealScreener()
         screener._call_api = AsyncMock(return_value=_make_message(ai_response))
@@ -112,48 +115,59 @@ class TestDealScreener:
 # DocumentParser Tests
 # ---------------------------------------------------------------------------
 
+
 class TestDocumentParser:
     def test_detect_doc_type_t12(self):
         parser = DocumentParser()
-        assert parser._detect_doc_type("Trailing 12 month income statement P&L") == "t12"
+        assert (
+            parser._detect_doc_type("Trailing 12 month income statement P&L") == "t12"
+        )
 
     def test_detect_doc_type_rent_roll(self):
         parser = DocumentParser()
-        assert parser._detect_doc_type("Rent roll unit # lease expiration market rent") == "rent_roll"
+        assert (
+            parser._detect_doc_type("Rent roll unit # lease expiration market rent")
+            == "rent_roll"
+        )
 
     def test_detect_doc_type_om(self):
         parser = DocumentParser()
-        assert parser._detect_doc_type("Offering memorandum executive summary cap rate") == "om"
+        assert (
+            parser._detect_doc_type("Offering memorandum executive summary cap rate")
+            == "om"
+        )
 
     @pytest.mark.asyncio
     async def test_parse_t12_mocked(self):
         """Parse T-12 with mocked AI response."""
-        t12_json = json.dumps({
-            "months_of_data": 12,
-            "annualized": False,
-            "income": {
-                "gross_scheduled_income": 576000,
-                "vacancy_loss": 28800,
-                "concessions": 0,
-                "other_income": 14400,
-                "effective_gross_income": 561600,
-            },
-            "expenses": {
-                "property_taxes": 72000,
-                "insurance": 18000,
-                "management_fees": 28080,
-                "repairs_maintenance": 36000,
-                "utilities": 12000,
-                "payroll": 0,
-                "administrative": 2400,
-                "marketing": 1200,
-                "other_expenses": 8400,
-                "total_expenses": 178080,
-            },
-            "net_operating_income": 383520,
-            "red_flags": [],
-            "notes": [],
-        })
+        t12_json = json.dumps(
+            {
+                "months_of_data": 12,
+                "annualized": False,
+                "income": {
+                    "gross_scheduled_income": 576000,
+                    "vacancy_loss": 28800,
+                    "concessions": 0,
+                    "other_income": 14400,
+                    "effective_gross_income": 561600,
+                },
+                "expenses": {
+                    "property_taxes": 72000,
+                    "insurance": 18000,
+                    "management_fees": 28080,
+                    "repairs_maintenance": 36000,
+                    "utilities": 12000,
+                    "payroll": 0,
+                    "administrative": 2400,
+                    "marketing": 1200,
+                    "other_expenses": 8400,
+                    "total_expenses": 178080,
+                },
+                "net_operating_income": 383520,
+                "red_flags": [],
+                "notes": [],
+            }
+        )
 
         parser = DocumentParser()
         parser._call_api = AsyncMock(return_value=_make_message(t12_json))

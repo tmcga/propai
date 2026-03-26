@@ -21,15 +21,25 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Literal
 
-from anthropic import AsyncAnthropic, APITimeoutError, RateLimitError, InternalServerError
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-
-logger = logging.getLogger(__name__)
+from anthropic import (
+    AsyncAnthropic,
+    APITimeoutError,
+    RateLimitError,
+    InternalServerError,
+)
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+)
 
 from agents.document_parser import T12Summary, RentRollSummary
 from engine.financial.models import DealInput
+
+logger = logging.getLogger(__name__)
 
 
 # ── Flag severity levels ──────────────────────────────────────────────────
@@ -40,17 +50,21 @@ SEVERITY = Literal["CRITICAL", "HIGH", "MEDIUM", "LOW"]
 @dataclass
 class RedFlag:
     severity: SEVERITY
-    category: str       # "Income", "Expenses", "Rent Roll", "Market", "Financing", "Physical"
+    category: (
+        str  # "Income", "Expenses", "Rent Roll", "Market", "Financing", "Physical"
+    )
     title: str
     detail: str
     suggested_action: str
-    financial_impact: str = ""   # e.g. "~$45K/yr NOI impact if corrected"
+    financial_impact: str = ""  # e.g. "~$45K/yr NOI impact if corrected"
 
 
 @dataclass
 class DDReport:
     overall_risk: Literal["HIGH", "MEDIUM", "LOW"]
-    proceed_recommendation: Literal["PROCEED", "PROCEED_WITH_CONDITIONS", "PAUSE", "PASS"]
+    proceed_recommendation: Literal[
+        "PROCEED", "PROCEED_WITH_CONDITIONS", "PAUSE", "PASS"
+    ]
     headline_summary: str
 
     red_flags: list[RedFlag]
@@ -77,12 +91,12 @@ class DDReport:
 
 # Market expense ratios by asset class (used to flag outliers)
 EXPENSE_RATIO_NORMS = {
-    "multifamily": (0.35, 0.55),       # (low, high) expected range
+    "multifamily": (0.35, 0.55),  # (low, high) expected range
     "small_multifamily": (0.30, 0.50),
     "sfr": (0.25, 0.45),
     "office": (0.30, 0.50),
-    "retail": (0.15, 0.35),            # NNN leases keep this low
-    "industrial": (0.10, 0.30),        # NNN
+    "retail": (0.15, 0.35),  # NNN leases keep this low
+    "industrial": (0.10, 0.30),  # NNN
     "self_storage": (0.25, 0.45),
     "mixed_use": (0.35, 0.50),
     "str": (0.45, 0.65),
@@ -91,7 +105,12 @@ EXPENSE_RATIO_NORMS = {
 
 # Expense line items that MUST be present (their absence is a red flag)
 REQUIRED_EXPENSE_LINES = {
-    "multifamily": ["property_taxes", "insurance", "management_fees", "repairs_maintenance"],
+    "multifamily": [
+        "property_taxes",
+        "insurance",
+        "management_fees",
+        "repairs_maintenance",
+    ],
     "office": ["property_taxes", "insurance", "management_fees", "utilities"],
     "retail": ["property_taxes", "insurance", "management_fees"],
     "industrial": ["property_taxes", "insurance"],
@@ -100,7 +119,6 @@ REQUIRED_EXPENSE_LINES = {
 
 
 class DueDiligenceAgent:
-
     def __init__(self) -> None:
         self.client = AsyncAnthropic()
 
@@ -109,11 +127,13 @@ class DueDiligenceAgent:
         deal: DealInput,
         t12: T12Summary | None = None,
         rent_roll: RentRollSummary | None = None,
-        additional_docs: str = "",      # free-text inspection notes, broker remarks, etc.
+        additional_docs: str = "",  # free-text inspection notes, broker remarks, etc.
     ) -> DDReport:
         """Run full due diligence analysis. Returns structured DDReport."""
         math_flags = self._math_pass(deal, t12, rent_roll)
-        ai_report = await self._ai_pass(deal, t12, rent_roll, math_flags, additional_docs)
+        ai_report = await self._ai_pass(
+            deal, t12, rent_roll, math_flags, additional_docs
+        )
         return ai_report
 
     # ── Pass 1: Rule-based math checks ───────────────────────────────────
@@ -131,44 +151,58 @@ class DueDiligenceAgent:
 
         # ── Expense ratio check ───────────────────────────────────────────
         noi = ops.gross_scheduled_income * (1 - ops.vacancy_rate) - (
-            ops.property_taxes + ops.insurance + ops.maintenance_reserves +
-            ops.capex_reserves + ops.utilities + ops.other_expenses +
-            ops.gross_scheduled_income * ops.management_fee_pct
+            ops.property_taxes
+            + ops.insurance
+            + ops.maintenance_reserves
+            + ops.capex_reserves
+            + ops.utilities
+            + ops.other_expenses
+            + ops.gross_scheduled_income * ops.management_fee_pct
         )
         egi = ops.gross_scheduled_income * (1 - ops.vacancy_rate) + ops.other_income
         if egi > 0:
             expense_ratio = 1 - (noi / egi)
             low, high = EXPENSE_RATIO_NORMS.get(asset_class, (0.35, 0.55))
             if expense_ratio < low:
-                flags.append({
-                    "type": "expense_ratio_low",
-                    "expense_ratio": expense_ratio,
-                    "expected_low": low,
-                    "estimated_missing_expenses": egi * (low - expense_ratio),
-                })
+                flags.append(
+                    {
+                        "type": "expense_ratio_low",
+                        "expense_ratio": expense_ratio,
+                        "expected_low": low,
+                        "estimated_missing_expenses": egi * (low - expense_ratio),
+                    }
+                )
             elif expense_ratio > high:
-                flags.append({
-                    "type": "expense_ratio_high",
-                    "expense_ratio": expense_ratio,
-                    "expected_high": high,
-                })
+                flags.append(
+                    {
+                        "type": "expense_ratio_high",
+                        "expense_ratio": expense_ratio,
+                        "expected_high": high,
+                    }
+                )
 
         # ── Management fee check ──────────────────────────────────────────
         if ops.management_fee_pct < 0.03:
-            flags.append({
-                "type": "management_fee_missing",
-                "fee_pct": ops.management_fee_pct,
-                "market_rate": 0.05,
-                "annual_impact": egi * (0.05 - ops.management_fee_pct),
-            })
+            flags.append(
+                {
+                    "type": "management_fee_missing",
+                    "fee_pct": ops.management_fee_pct,
+                    "market_rate": 0.05,
+                    "annual_impact": egi * (0.05 - ops.management_fee_pct),
+                }
+            )
 
         # ── CapEx reserves check ──────────────────────────────────────────
         if deal.units and ops.capex_reserves < deal.units * 300:
-            flags.append({
-                "type": "capex_reserves_low",
-                "capex_per_unit": ops.capex_reserves / deal.units if deal.units else 0,
-                "market_minimum_per_unit": 300,
-            })
+            flags.append(
+                {
+                    "type": "capex_reserves_low",
+                    "capex_per_unit": ops.capex_reserves / deal.units
+                    if deal.units
+                    else 0,
+                    "market_minimum_per_unit": 300,
+                }
+            )
 
         # ── DSCR check ────────────────────────────────────────────────────
         r = deal.loan.interest_rate / 12
@@ -186,12 +220,14 @@ class DueDiligenceAgent:
             if t12.net_operating_income > 0:
                 variance = (noi - t12.net_operating_income) / t12.net_operating_income
                 if variance > 0.10:
-                    flags.append({
-                        "type": "noi_variance",
-                        "underwriting_noi": noi,
-                        "t12_noi": t12.net_operating_income,
-                        "variance_pct": variance,
-                    })
+                    flags.append(
+                        {
+                            "type": "noi_variance",
+                            "underwriting_noi": noi,
+                            "t12_noi": t12.net_operating_income,
+                            "variance_pct": variance,
+                        }
+                    )
 
             # Missing expense lines
             required = REQUIRED_EXPENSE_LINES.get(asset_class, [])
@@ -200,14 +236,21 @@ class DueDiligenceAgent:
             if "insurance" in required and t12.insurance == 0:
                 flags.append({"type": "missing_expense", "line": "insurance"})
             if "management_fees" in required and t12.management_fees == 0:
-                flags.append({"type": "missing_expense", "line": "management_fees (possible self-management)"})
+                flags.append(
+                    {
+                        "type": "missing_expense",
+                        "line": "management_fees (possible self-management)",
+                    }
+                )
 
             # Annualized partial year
             if t12.annualized and t12.months_of_data < 10:
-                flags.append({
-                    "type": "partial_year_annualized",
-                    "months": t12.months_of_data,
-                })
+                flags.append(
+                    {
+                        "type": "partial_year_annualized",
+                        "months": t12.months_of_data,
+                    }
+                )
 
         # ── Rent roll specific checks ─────────────────────────────────────
         if rent_roll:
@@ -215,33 +258,46 @@ class DueDiligenceAgent:
             rr_vacancy = rent_roll.physical_vacancy
             uw_vacancy = ops.vacancy_rate
             if rr_vacancy > uw_vacancy + 0.05:
-                flags.append({
-                    "type": "vacancy_underestimated",
-                    "rent_roll_vacancy": rr_vacancy,
-                    "underwriting_vacancy": uw_vacancy,
-                    "annual_impact": rent_roll.scheduled_income_annual * (rr_vacancy - uw_vacancy),
-                })
+                flags.append(
+                    {
+                        "type": "vacancy_underestimated",
+                        "rent_roll_vacancy": rr_vacancy,
+                        "underwriting_vacancy": uw_vacancy,
+                        "annual_impact": rent_roll.scheduled_income_annual
+                        * (rr_vacancy - uw_vacancy),
+                    }
+                )
 
             # Loss-to-lease
             if rent_roll.loss_to_lease > 0:
-                ltl_pct = rent_roll.loss_to_lease / rent_roll.scheduled_income_annual if rent_roll.scheduled_income_annual else 0
+                ltl_pct = (
+                    rent_roll.loss_to_lease / rent_roll.scheduled_income_annual
+                    if rent_roll.scheduled_income_annual
+                    else 0
+                )
                 if ltl_pct > 0.03:
-                    flags.append({
-                        "type": "loss_to_lease",
-                        "annual_amount": rent_roll.loss_to_lease,
-                        "pct_of_gsi": ltl_pct,
-                    })
+                    flags.append(
+                        {
+                            "type": "loss_to_lease",
+                            "annual_amount": rent_roll.loss_to_lease,
+                            "pct_of_gsi": ltl_pct,
+                        }
+                    )
 
             # Income mismatch between rent roll and T-12
             if t12 and rent_roll.actual_income_annual > 0:
-                income_variance = abs(t12.gross_scheduled_income - rent_roll.scheduled_income_annual)
+                income_variance = abs(
+                    t12.gross_scheduled_income - rent_roll.scheduled_income_annual
+                )
                 if income_variance / rent_roll.scheduled_income_annual > 0.05:
-                    flags.append({
-                        "type": "income_mismatch",
-                        "rent_roll_gsi": rent_roll.scheduled_income_annual,
-                        "t12_gsi": t12.gross_scheduled_income,
-                        "variance": income_variance,
-                    })
+                    flags.append(
+                        {
+                            "type": "income_mismatch",
+                            "rent_roll_gsi": rent_roll.scheduled_income_annual,
+                            "t12_gsi": t12.gross_scheduled_income,
+                            "variance": income_variance,
+                        }
+                    )
 
         return flags
 
@@ -351,8 +407,12 @@ class DueDiligenceAgent:
 
         if t12:
             lines.append("\nTRAILING-12 INCOME STATEMENT:")
-            lines.append(f"  Months of data: {t12.months_of_data} ({'annualized' if t12.annualized else 'actual'})")
-            lines.append(f"  Gross Scheduled Income: ${t12.gross_scheduled_income:,.0f}")
+            lines.append(
+                f"  Months of data: {t12.months_of_data} ({'annualized' if t12.annualized else 'actual'})"
+            )
+            lines.append(
+                f"  Gross Scheduled Income: ${t12.gross_scheduled_income:,.0f}"
+            )
             lines.append(f"  Vacancy Loss: ${t12.vacancy_loss:,.0f}")
             lines.append(f"  Other Income: ${t12.other_income:,.0f}")
             lines.append(f"  EGI: ${t12.effective_gross_income:,.0f}")
@@ -373,13 +433,19 @@ class DueDiligenceAgent:
             lines.append(f"  Total Units: {rent_roll.total_units}")
             lines.append(f"  Occupied Units: {rent_roll.occupied_units}")
             lines.append(f"  Physical Vacancy: {rent_roll.physical_vacancy:.1%}")
-            lines.append(f"  Scheduled Income (annual): ${rent_roll.scheduled_income_annual:,.0f}")
-            lines.append(f"  Actual Income (annual): ${rent_roll.actual_income_annual:,.0f}")
+            lines.append(
+                f"  Scheduled Income (annual): ${rent_roll.scheduled_income_annual:,.0f}"
+            )
+            lines.append(
+                f"  Actual Income (annual): ${rent_roll.actual_income_annual:,.0f}"
+            )
             lines.append(f"  Loss-to-Lease (annual): ${rent_roll.loss_to_lease:,.0f}")
             if rent_roll.unit_mix:
                 lines.append("  Unit Mix:")
                 for u in rent_roll.unit_mix:
-                    lines.append(f"    {u.get('type')}: {u.get('count')} units @ ${u.get('avg_market_rent', 0):,.0f}/mo avg")
+                    lines.append(
+                        f"    {u.get('type')}: {u.get('count')} units @ ${u.get('avg_market_rent', 0):,.0f}/mo avg"
+                    )
 
         if additional_docs:
             lines.append(f"\nADDITIONAL DOCUMENTS / NOTES:\n{additional_docs}")
@@ -398,7 +464,9 @@ class DueDiligenceAgent:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
-        retry=retry_if_exception_type((APITimeoutError, RateLimitError, InternalServerError)),
+        retry=retry_if_exception_type(
+            (APITimeoutError, RateLimitError, InternalServerError)
+        ),
         reraise=True,
     )
     async def _call_api(self, context: str):
@@ -406,9 +474,10 @@ class DueDiligenceAgent:
             model="claude-opus-4-6",
             max_tokens=4096,
             system=self.DD_SYSTEM_PROMPT,
-            messages=[{
-                "role": "user",
-                "content": f"""Analyze this real estate deal for red flags and risks. Return structured JSON.
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"""Analyze this real estate deal for red flags and risks. Return structured JSON.
 
 {context}
 
@@ -433,6 +502,7 @@ Return ONLY valid JSON matching this schema:
   "diligence_questions": ["Question to ask seller 1", "..."],
   "document_requests": ["Document to request 1", "..."],
   "full_analysis": "3-5 paragraph detailed analysis"
-}}"""
-            }],
+}}""",
+                }
+            ],
         )

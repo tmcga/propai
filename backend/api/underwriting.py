@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import time
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import JSONResponse
 
 from engine.financial import (
     DealInput,
@@ -96,7 +95,9 @@ async def underwrite_quick(deal: DealInput) -> dict:
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Quick underwriting failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Quick underwriting failed: {str(e)}"
+        )
 
 
 @router.get("/sample", response_model=DealInput, summary="Sample deal for UI demo")
@@ -123,10 +124,10 @@ async def sample_deal() -> DealInput:
             origination_fee=0.01,
         ),
         operations=OperatingAssumptions(
-            gross_scheduled_income=576_000,   # 24 units × $2,000/mo
+            gross_scheduled_income=576_000,  # 24 units × $2,000/mo
             vacancy_rate=0.05,
             credit_loss_rate=0.01,
-            other_income=14_400,              # laundry + parking
+            other_income=14_400,  # laundry + parking
             property_taxes=72_000,
             insurance=18_000,
             management_fee_pct=0.05,
@@ -153,7 +154,11 @@ async def sample_deal() -> DealInput:
     )
 
 
-@router.get("/sample/result", response_model=UnderwritingResult, summary="Sample underwriting result")
+@router.get(
+    "/sample/result",
+    response_model=UnderwritingResult,
+    summary="Sample underwriting result",
+)
 async def sample_result() -> UnderwritingResult:
     """
     Returns a fully computed underwriting result for the sample deal.

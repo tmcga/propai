@@ -6,7 +6,7 @@ interface Props {
   formatAs: "percent" | "multiple";
 }
 
-export default function SensitivityGrid({ table, formatAs }: Props) {
+export default function SensitivityGrid({ table }: Props) {
   const { row_values, col_values, data } = table;
   const isIRR = table.metric === "irr";
 
@@ -35,7 +35,7 @@ export default function SensitivityGrid({ table, formatAs }: Props) {
               <td className="py-1.5 pr-3 text-slate-400 font-medium">
                 {fmt(rv, "percent", 2)}
               </td>
-              {col_values.map((cv, ci) => {
+              {col_values.map((_cv, ci) => {
                 const val = data[ri][ci];
                 return (
                   <td

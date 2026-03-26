@@ -14,9 +14,8 @@ ACS variable reference: https://api.census.gov/data/2022/acs/acs5/variables.json
 from __future__ import annotations
 
 import os
-import json
 import logging
-from typing import Optional, Any
+from typing import Optional
 from dataclasses import dataclass, field
 
 import httpx
@@ -29,26 +28,26 @@ ACS_YEAR = "2022"  # Most recent stable ACS 5-year vintage
 # ── ACS 5-Year variable codes ──────────────────────────────────────────────
 ACS_VARS = {
     # Population
-    "total_population":        "B01003_001E",
+    "total_population": "B01003_001E",
     # Age
-    "median_age":              "B01002_001E",
+    "median_age": "B01002_001E",
     # Income
-    "median_hh_income":        "B19013_001E",
-    "per_capita_income":       "B19301_001E",
-    "poverty_rate_pop":        "B17001_002E",   # Pop below poverty level
-    "total_pop_poverty_denom": "B17001_001E",   # Denominator for poverty %
+    "median_hh_income": "B19013_001E",
+    "per_capita_income": "B19301_001E",
+    "poverty_rate_pop": "B17001_002E",  # Pop below poverty level
+    "total_pop_poverty_denom": "B17001_001E",  # Denominator for poverty %
     # Housing
-    "total_housing_units":     "B25001_001E",
-    "occupied_units":          "B25002_002E",
-    "vacant_units":            "B25002_003E",
-    "owner_occupied":          "B25003_002E",
-    "renter_occupied":         "B25003_003E",
-    "median_home_value":       "B25077_001E",
-    "median_gross_rent":       "B25064_001E",
-    "median_rooms":            "B25018_001E",
+    "total_housing_units": "B25001_001E",
+    "occupied_units": "B25002_002E",
+    "vacant_units": "B25002_003E",
+    "owner_occupied": "B25003_002E",
+    "renter_occupied": "B25003_003E",
+    "median_home_value": "B25077_001E",
+    "median_gross_rent": "B25064_001E",
+    "median_rooms": "B25018_001E",
     # Education
-    "bachelors_or_higher":     "B15003_022E",   # Pop 25+ with bachelor's
-    "pop_25_plus":             "B15003_001E",   # Denominator for education %
+    "bachelors_or_higher": "B15003_022E",  # Pop 25+ with bachelor's
+    "pop_25_plus": "B15003_001E",  # Denominator for education %
 }
 
 
@@ -57,7 +56,7 @@ class DemographicProfile:
     """Demographic and housing snapshot for a geography."""
 
     geography: str
-    geography_type: str   # "county", "place", "zip", "metro"
+    geography_type: str  # "county", "place", "zip", "metro"
 
     # Population
     total_population: Optional[int] = None
@@ -81,9 +80,9 @@ class DemographicProfile:
     bachelors_plus_rate: Optional[float] = None
 
     # Derived signals
-    rent_to_income_ratio: Optional[float] = None   # Annual rent / HH income
+    rent_to_income_ratio: Optional[float] = None  # Annual rent / HH income
     price_to_income_ratio: Optional[float] = None  # Home value / HH income
-    price_to_rent_ratio: Optional[float] = None    # Home value / (annual rent)
+    price_to_rent_ratio: Optional[float] = None  # Home value / (annual rent)
 
     # Metadata
     data_year: str = ACS_YEAR
@@ -199,7 +198,9 @@ class CensusClient:
             38060 — Phoenix-Mesa-Chandler, AZ
             42660 — Seattle-Tacoma-Bellevue, WA
         """
-        geo_params = {"for": f"metropolitan statistical area/micropolitan statistical area:{cbsa_code}"}
+        geo_params = {
+            "for": f"metropolitan statistical area/micropolitan statistical area:{cbsa_code}"
+        }
         return await self._fetch_profile(geo_params, f"Metro {cbsa_code}", "metro")
 
     # ------------------------------------------------------------------
@@ -350,16 +351,56 @@ class CensusClient:
     def state_fips(state_abbr: str) -> Optional[str]:
         """Convert state abbreviation to 2-digit FIPS code."""
         mapping = {
-            "AL": "01", "AK": "02", "AZ": "04", "AR": "05", "CA": "06",
-            "CO": "08", "CT": "09", "DE": "10", "FL": "12", "GA": "13",
-            "HI": "15", "ID": "16", "IL": "17", "IN": "18", "IA": "19",
-            "KS": "20", "KY": "21", "LA": "22", "ME": "23", "MD": "24",
-            "MA": "25", "MI": "26", "MN": "27", "MS": "28", "MO": "29",
-            "MT": "30", "NE": "31", "NV": "32", "NH": "33", "NJ": "34",
-            "NM": "35", "NY": "36", "NC": "37", "ND": "38", "OH": "39",
-            "OK": "40", "OR": "41", "PA": "42", "RI": "44", "SC": "45",
-            "SD": "46", "TN": "47", "TX": "48", "UT": "49", "VT": "50",
-            "VA": "51", "WA": "53", "WV": "54", "WI": "55", "WY": "56",
+            "AL": "01",
+            "AK": "02",
+            "AZ": "04",
+            "AR": "05",
+            "CA": "06",
+            "CO": "08",
+            "CT": "09",
+            "DE": "10",
+            "FL": "12",
+            "GA": "13",
+            "HI": "15",
+            "ID": "16",
+            "IL": "17",
+            "IN": "18",
+            "IA": "19",
+            "KS": "20",
+            "KY": "21",
+            "LA": "22",
+            "ME": "23",
+            "MD": "24",
+            "MA": "25",
+            "MI": "26",
+            "MN": "27",
+            "MS": "28",
+            "MO": "29",
+            "MT": "30",
+            "NE": "31",
+            "NV": "32",
+            "NH": "33",
+            "NJ": "34",
+            "NM": "35",
+            "NY": "36",
+            "NC": "37",
+            "ND": "38",
+            "OH": "39",
+            "OK": "40",
+            "OR": "41",
+            "PA": "42",
+            "RI": "44",
+            "SC": "45",
+            "SD": "46",
+            "TN": "47",
+            "TX": "48",
+            "UT": "49",
+            "VT": "50",
+            "VA": "51",
+            "WA": "53",
+            "WV": "54",
+            "WI": "55",
+            "WY": "56",
             "DC": "11",
         }
         return mapping.get(state_abbr.upper())
